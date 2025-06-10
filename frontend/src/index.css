@@ -49,7 +49,7 @@ body {
 
 /* Button hover effects */
 .btn-primary {
-  @apply bg-blue-gradient text-white px-6 py-3 rounded-lg font-medium shadow-custom hover:shadow-custom-lg transform hover:-translate-y-0.5;
+  @apply text-white px-6 py-3 rounded-lg font-medium shadow-custom hover:shadow-custom-lg transform hover:-translate-y-0.5;
 }
 
 .btn-secondary {
