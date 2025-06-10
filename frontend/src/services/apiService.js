@@ -2,10 +2,10 @@
 class FixedApiService {
   constructor() {
     // Get API URL from environment variables or use default
-    this.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+    this.baseURL = import.meta.env.VITE_API_URL || 'https://silenbek-production.up.railway.app'
     this.timeout = 30000 // 30 seconds timeout
     
-    console.log('🚀 FixedApiService initialized with baseURL:', this.baseURL)
+    console.log(' FixedApiService initialized with baseURL:', this.baseURL)
   }
 
   // Generic request method dengan detailed logging
@@ -38,15 +38,15 @@ class FixedApiService {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        console.error('❌ Request failed:', errorData)
+        console.error('Request failed:', errorData)
         throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
       }
 
       const data = await response.json()
-      console.log('✅ Response data:', data)
+      console.log('Response data:', data)
       return data
     } catch (error) {
-      console.error('❌ Request error:', error)
+      console.error('Request error:', error)
       
       if (error.name === 'AbortError') {
         throw new Error('Request timeout - Please try again')
@@ -82,7 +82,7 @@ class FixedApiService {
   // Convert File/Blob to base64 string dengan logging
   fileToBase64(file) {
     return new Promise((resolve, reject) => {
-      console.log('🔄 Converting file to base64:', {
+      console.log('Converting file to base64:', {
         name: file.name,
         type: file.type,
         size: file.size
@@ -93,11 +93,11 @@ class FixedApiService {
         const base64 = reader.result
         // Remove data URL prefix to get pure base64
         const base64Data = base64.split(',')[1]
-        console.log('✅ Base64 conversion complete, length:', base64Data.length)
+        console.log('Base64 conversion complete, length:', base64Data.length)
         resolve(base64Data)
       }
       reader.onerror = (error) => {
-        console.error('❌ FileReader error:', error)
+        console.error('FileReader error:', error)
         reject(error)
       }
       reader.readAsDataURL(file)
@@ -107,12 +107,12 @@ class FixedApiService {
   // Health check endpoint
   async healthCheck() {
     try {
-      console.log('🏥 Performing health check...')
+      console.log('Performing health check...')
       const response = await this.get('/api/health')
-      console.log('✅ Health check successful:', response)
+      console.log('Health check successful:', response)
       return response
     } catch (error) {
-      console.error('❌ Health check failed:', error)
+      console.error('Health check failed:', error)
       throw new Error(`Health check failed: ${error.message}`)
     }
   }
@@ -120,8 +120,8 @@ class FixedApiService {
   // FIXED: Predict image endpoint - simplified and robust
   async predictImage(imageInput, language = 'bisindo') {
     try {
-      console.log('🔮 ApiService: Starting prediction...')
-      console.log('📝 Input params:', { hasImage: !!imageInput, language })
+      console.log('ApiService: Starting prediction...')
+      console.log('Input params:', { hasImage: !!imageInput, language })
       
       let imageFile = null
       
@@ -131,11 +131,11 @@ class FixedApiService {
         imageFile = imageInput.get('image')
         const formLanguage = imageInput.get('dataset_type')
         if (formLanguage) language = formLanguage
-        console.log('📋 Extracted from FormData:', { hasImageFile: !!imageFile, language })
+        console.log('Extracted from FormData:', { hasImageFile: !!imageFile, language })
       } else if (imageInput instanceof File || imageInput instanceof Blob) {
         // Direct file/blob
         imageFile = imageInput
-        console.log('📁 Direct file input:', { type: imageFile.type, size: imageFile.size })
+        console.log('Direct file input:', { type: imageFile.type, size: imageFile.size })
       } else {
         throw new Error('Invalid image input type. Expected FormData, File, or Blob.')
       }
@@ -148,21 +148,21 @@ class FixedApiService {
       this.validateImageFile(imageFile)
 
       // Convert image to base64 (what backend expects)
-      console.log('🔄 Converting to base64...')
+      console.log('Converting to base64...')
       const base64Image = await this.fileToBase64(imageFile)
-      console.log('✅ Base64 conversion complete')
+      console.log('Base64 conversion complete')
 
       // Send to backend endpoint
-      console.log('📡 Sending to backend...')
+      console.log('Sending to backend...')
       const response = await this.post('/api/translate', {
         image: base64Image,
         language_type: language
       })
 
-      console.log('🎯 Prediction response:', response)
+      console.log('Prediction response:', response)
       return response
     } catch (error) {
-      console.error('❌ Prediction failed:', error)
+      console.error('Prediction failed:', error)
       throw new Error(`Prediction failed: ${error.message}`)
     }
   }
@@ -170,12 +170,12 @@ class FixedApiService {
   // Batch prediction endpoint
   async predictBatch(formData) {
     try {
-      console.log('📦 Starting batch prediction...')
+      console.log('Starting batch prediction...')
       
       const imageFiles = formData.getAll('images')
       const language = formData.get('dataset_type') || 'bisindo'
 
-      console.log('📋 Batch params:', { fileCount: imageFiles.length, language })
+      console.log('Batch params:', { fileCount: imageFiles.length, language })
 
       if (!imageFiles || imageFiles.length === 0) {
         throw new Error('No image files provided')
@@ -186,7 +186,7 @@ class FixedApiService {
       // Process each image individually since backend doesn't have batch endpoint
       for (let i = 0; i < imageFiles.length; i++) {
         const imageFile = imageFiles[i]
-        console.log(`🔄 Processing image ${i+1}/${imageFiles.length}: ${imageFile.name}`)
+        console.log(`Processing image ${i+1}/${imageFiles.length}: ${imageFile.name}`)
         
         try {
           const response = await this.predictImage(imageFile, language)
@@ -198,9 +198,9 @@ class FixedApiService {
             success: response.success !== false
           })
           
-          console.log(`✅ Image ${i+1} processed successfully`)
+          console.log(`Image ${i+1} processed successfully`)
         } catch (error) {
-          console.error(`❌ Image ${i+1} failed:`, error)
+          console.error(`Image ${i+1} failed:`, error)
           results.push({
             success: false,
             error: error.message,
@@ -216,7 +216,7 @@ class FixedApiService {
       }
 
       const successfulResults = results.filter(r => r.success)
-      console.log(`🎯 Batch complete: ${successfulResults.length}/${results.length} successful`)
+      console.log(`Batch complete: ${successfulResults.length}/${results.length} successful`)
 
       return {
         success: true,
@@ -225,7 +225,7 @@ class FixedApiService {
         successful: successfulResults.length
       }
     } catch (error) {
-      console.error('❌ Batch prediction failed:', error)
+      console.error('Batch prediction failed:', error)
       throw new Error(`Batch prediction failed: ${error.message}`)
     }
   }
@@ -233,9 +233,9 @@ class FixedApiService {
   // Get model information
   async getModelInfo() {
     try {
-      console.log('🤖 Getting model info...')
+      console.log('Getting model info...')
       const response = await this.get('/api/models')
-      console.log('✅ Model info retrieved:', response)
+      console.log('Model info retrieved:', response)
       return response
     } catch (error) {
       console.error('❌ Failed to get model info:', error)
