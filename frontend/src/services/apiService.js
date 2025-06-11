@@ -1,16 +1,17 @@
 // Updated apiService.js for Railway Backend Connection
 class ApiService {
   constructor() {
-    // Priority: Environment variable > Vite config > Hardcoded Railway URL
+    // Railway backend URL (fixed)
     this.baseURL = import.meta.env.VITE_API_URL || 
                    import.meta.env.VITE_API_BASE_URL || 
                    'https://silenbek-production.up.railway.app'
 
-    this.timeout = 30000
+    this.timeout = 45000 // Increased timeout for Railway cold starts
     
     console.log('🚀 ApiService initialized for Railway backend')
-    console.log('📡 Backend URL:', this.baseURL)
+    console.log('📡 Railway Backend URL:', this.baseURL)
     console.log('🌍 Environment:', import.meta.env.MODE)
+    console.log('🏠 Frontend URL:', window.location.origin)
     
     // Test connection immediately
     this.testConnectionOnInit()
@@ -18,18 +19,21 @@ class ApiService {
 
   async testConnectionOnInit() {
     try {
-      console.log('🧪 Testing initial Railway connection...')
+      console.log('🧪 Testing Railway connection...')
       const health = await this.healthCheck()
       console.log('✅ Railway backend connected:', health)
       
-      const models = await this.getModelInfo()
-      console.log('🤖 Model status:', models)
+      if (health.models_summary) {
+        const modelCount = Object.keys(health.models_summary).length
+        console.log(`🤖 ${modelCount} models available on Railway:`, Object.keys(health.models_summary))
+      }
     } catch (error) {
       console.error('❌ Railway connection failed:', error)
-      console.warn('🔧 Troubleshooting tips:')
-      console.warn('1. Check if Railway backend is deployed and running')
-      console.warn('2. Verify Railway URL:', this.baseURL)
-      console.warn('3. Check CORS configuration in backend')
+      console.warn('🔧 Railway troubleshooting:')
+      console.warn('1. Railway service might be sleeping (first request takes 30-60s)')
+      console.warn('2. Check if Railway deployment is successful')
+      console.warn('3. Verify CORS configuration allows Vercel domain')
+      console.warn('4. Backend URL:', this.baseURL)
     }
   }
 
@@ -39,10 +43,10 @@ class ApiService {
       timeout: this.timeout,
       ...options,
       headers: {
-        'User-Agent': 'SILENT-Frontend-Vercel/1.0',
+        'User-Agent': 'SILENT-Frontend-Vercel/2.0',
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Origin': 'https://silentdicoding.vercel.app', // Add explicit origin
+        'Origin': window.location.origin, // Dynamic origin
         ...options.headers,
       },
     }
@@ -51,7 +55,7 @@ class ApiService {
       url,
       method: config.method || 'GET',
       hasBody: !!config.body,
-      headers: config.headers
+      origin: config.headers.Origin
     })
 
     try {
@@ -68,7 +72,7 @@ class ApiService {
       console.log('📥 Railway response:', {
         status: response.status,
         statusText: response.statusText,
-        url: response.url
+        ok: response.ok
       })
 
       if (!response.ok) {
@@ -80,21 +84,21 @@ class ApiService {
       }
 
       const data = await response.json()
-      console.log('✅ Railway response data:', data)
+      console.log('✅ Railway response data received')
       return data
     } catch (error) {
       console.error('💥 Railway request error:', error)
       
       if (error.name === 'AbortError') {
-        throw new Error('Request timeout - Railway backend may be sleeping or overloaded')
+        throw new Error('Railway timeout - Service might be starting up, please wait and try again')
       }
       
       if (error.message.includes('fetch') || error.message.includes('NetworkError')) {
-        throw new Error(`Network error - Cannot connect to Railway backend at ${this.baseURL}`)
+        throw new Error(`Network error - Cannot connect to Railway backend. Check your internet connection.`)
       }
 
       if (error.message.includes('CORS')) {
-        throw new Error('CORS error - Backend needs to allow requests from Vercel domain')
+        throw new Error('CORS error - Railway backend CORS configuration issue')
       }
       
       throw error
@@ -104,14 +108,14 @@ class ApiService {
   async healthCheck() {
     console.log('🏥 Checking Railway backend health...')
     const response = await this.request('/api/health')
-    console.log('💚 Railway health check result:', response)
+    console.log('💚 Railway health check result:', response.status)
     return response
   }
 
   async getModelInfo() {
     console.log('🤖 Getting Railway model info...')
     const response = await this.request('/api/models')
-    console.log('📊 Railway model info:', response)
+    console.log('📊 Railway models:', response.total_models || 0)
     return response
   }
 
@@ -121,7 +125,7 @@ class ApiService {
       await this.healthCheck()
       return true
     } catch (error) {
-      console.warn('Backend not available:', error.message)
+      console.warn('Railway backend not available:', error.message)
       return false
     }
   }
@@ -181,16 +185,16 @@ class ApiService {
 
       console.log('🔄 Converting to base64 for Railway...')
       const base64Image = await this.fileToBase64(imageFile)
-      console.log('✅ Base64 ready for Railway')
+      console.log('✅ Base64 ready for Railway backend')
 
       console.log('📡 Sending to Railway backend...')
       const requestData = {
         image: base64Image,
         language_type: language,
-        mirror_mode: mirrorMode // Add mirror mode support
+        mirror_mode: mirrorMode
       }
       
-      console.log('📤 Railway request payload:', {
+      console.log('📤 Railway request payload size:', {
         has_image: !!requestData.image,
         image_length: requestData.image?.length,
         language_type: requestData.language_type,
@@ -205,22 +209,30 @@ class ApiService {
         body: JSON.stringify(requestData)
       })
 
-      console.log('🎉 Railway prediction response:', response)
+      console.log('🎉 Railway prediction response:', {
+        success: response.success,
+        prediction: response.prediction,
+        confidence: response.confidence,
+        dataset: response.dataset
+      })
+      
       return response
     } catch (error) {
       console.error('💥 Railway prediction failed:', error)
       
       // Enhanced error handling for Railway
       if (error.message.includes('timeout')) {
-        throw new Error('Railway backend is taking too long to respond. The service might be sleeping - please try again.')
+        throw new Error('Railway backend timeout - Service might be sleeping. Please try again in a moment.')
       } else if (error.message.includes('Network error')) {
         throw new Error('Cannot connect to Railway backend. Please check your internet connection.')
       } else if (error.message.includes('CORS')) {
-        throw new Error('CORS error: Railway backend needs to be configured to accept requests from Vercel.')
+        throw new Error('CORS error - Railway backend configuration issue.')
       } else if (error.message.includes('500')) {
-        throw new Error('Railway backend error: The prediction service encountered an internal error.')
+        throw new Error('Railway backend internal error - The prediction service encountered an error.')
       } else if (error.message.includes('404')) {
-        throw new Error('Railway backend endpoint not found. Please check the backend deployment.')
+        throw new Error('Railway endpoint not found - Backend deployment issue.')
+      } else if (error.message.includes('413')) {
+        throw new Error('Image too large for Railway backend - Please use a smaller image.')
       }
       
       throw error
@@ -229,7 +241,7 @@ class ApiService {
 
   validateImageFile(file) {
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/bmp']
-    const maxSize = 16 * 1024 * 1024 // 16MB
+    const maxSize = 10 * 1024 * 1024 // 10MB for Railway
 
     console.log('🔍 Validating image file:', {
       name: file.name,
@@ -244,7 +256,7 @@ class ApiService {
     }
 
     if (file.size > maxSize) {
-      const error = 'File too large. Maximum size is 16MB.'
+      const error = 'File too large. Maximum size is 10MB for Railway backend.'
       console.error('❌ Validation failed:', error)
       throw new Error(error)
     }
@@ -254,19 +266,19 @@ class ApiService {
   }
 
   async debugFullFlow() {
-    console.log('🔧 === RAILWAY DEBUG FLOW ===')
+    console.log('🔧 === RAILWAY FULL DEBUG FLOW ===')
     
     try {
       // 1. Health check
-      console.log('1️⃣ Testing Railway health check...')
+      console.log('Testing Railway health...')
       const health = await this.healthCheck()
       
       // 2. Model info
-      console.log('2️⃣ Testing Railway model info...')
+      console.log('Testing Railway models...')
       const models = await this.getModelInfo()
       
-      // 3. Test prediction with small image
-      console.log('3️⃣ Testing Railway prediction...')
+      // 3. Test prediction with Railway
+      console.log('Testing Railway prediction...')
       
       // Create a simple test image (1x1 pixel PNG)
       const testImageB64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='
@@ -284,29 +296,30 @@ class ApiService {
           })
         })
         
-        console.log('✅ Railway test prediction result:', testResult)
+        console.log('Railway test prediction result:', testResult)
         
         // Validate response format
         const hasValidFields = testResult.success !== undefined && 
                                testResult.prediction !== undefined &&
                                testResult.confidence !== undefined
-        console.log(`📝 Response validation: ${hasValidFields ? 'VALID' : 'INVALID'}`)
+        console.log(`Response validation: ${hasValidFields ? 'VALID' : 'INVALID'}`)
         
       } catch (predError) {
-        console.error('❌ Railway test prediction failed:', predError)
+        console.error('Railway test prediction failed:', predError)
       }
       
-      console.log('4️⃣ Railway backend tests completed')
+      console.log('Railway backend tests completed')
       
       return {
         health,
         models,
         status: 'railway_debug_complete',
-        backend_url: this.baseURL
+        backend_url: this.baseURL,
+        frontend_url: window.location.origin
       }
       
     } catch (error) {
-      console.error('💥 Railway debug flow failed:', error)
+      console.error('Railway debug flow failed:', error)
       throw error
     }
   }
@@ -316,9 +329,12 @@ class ApiService {
 export const apiService = new ApiService()
 export default ApiService
 
-// Add global debug function for testing
+// Add global debug function for testing Railway connection
 window.debugRailwayAPI = () => {
   return apiService.debugFullFlow()
 }
 
-console.log('🚀 Railway API Service loaded - run window.debugRailwayAPI() to test connection')
+console.log('Railway API Service loaded for Vercel deployment')
+console.log('Test connection: window.debugRailwayAPI()')
+console.log('Frontend URL:', window.location.origin)
+console.log('Backend URL: https://silenbek-production.up.railway.app')
