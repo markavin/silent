@@ -4,20 +4,6 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
-   safelist: [
-    'btn-primary',
-    'btn-secondary',
-    'card',
-    'card-hover',
-    'card-hover.active',
-    'loading-spinner',
-    'fade-in',
-    'camera-preview',
-    'prediction-result',
-    'prediction-result.high-confidence',
-    'prediction-result.medium-confidence',
-    'prediction-result.low-confidence'
-  ],
   theme: {
     extend: {
       colors: {

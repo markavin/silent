@@ -295,7 +295,7 @@ function TranslatePage() {
                 <h3 className={`text-lg font-semibold mb-2 ${currentMode === 'camera' ? 'text-blue-600' : 'text-gray-800'
                   }`}>Kamera</h3>
                 <p className="text-gray-600 text-sm">
-                  Terjemahkan bahasa isyarat secara Real-time
+                  Terjemahkan bahasa isyarat secara Waktu Nyata
                 </p>
                 {currentMode === 'camera' && (
                   <div className="mt-3 flex items-center justify-center">
@@ -325,7 +325,7 @@ function TranslatePage() {
                 <h3 className={`text-lg font-semibold mb-2 ${currentMode === 'upload' ? 'text-blue-600' : 'text-gray-800'
                   }`}>Gambar</h3>
                 <p className="text-gray-600 text-sm">
-                  Unggah multiple foto (additive mode)
+                  Unggah banyak foto (mode aditif)
                 </p>
                 {currentMode === 'upload' && (
                   <div className="mt-3 flex items-center justify-center">
@@ -347,7 +347,7 @@ function TranslatePage() {
                 <span>Terjemahan</span>
                 {currentMode && (
                   <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
-                    {currentMode === 'camera' ? '📷 Camera Mode' : '🖼️ Upload Mode'}
+                    {currentMode === 'camera' ? '📷 Mode Kamera' : '🖼️ Mode Unggah'}
                   </span>
                 )}
               </h3>
@@ -361,19 +361,24 @@ function TranslatePage() {
                   </p>
                 </div>
               )}
-   
+
+              {/* PERBAIKAN UTAMA: Kondisi yang benar untuk render komponen */}
+              {currentMode === 'camera' && (
                 <div className="fade-in">
                   <CameraCapture
                     language={selectedLanguage}
                     onPrediction={handleCameraPrediction}
                   />
                 </div>
+              )}
 
               {currentMode === 'upload' && (
-                <ImageUpload
-                  language={selectedLanguage}
-                  onPrediction={handleUploadPrediction}
-                />
+                <div className="fade-in">
+                  <ImageUpload
+                    language={selectedLanguage}
+                    onPrediction={handleUploadPrediction}
+                  />
+                </div>
               )}
 
               {predictionResult && (
@@ -400,7 +405,7 @@ function TranslatePage() {
                 <div className="text-center py-8">
                   <div className="text-4xl mb-2">📝</div>
                   <p className="text-gray-500 text-sm">
-                    History terjemahan akan<br />
+                    Riwayat terjemahan akan<br />
                     muncul di sini...
                   </p>
                 </div>
@@ -456,7 +461,7 @@ function TranslatePage() {
   );
 }
 
-// About Page Component (Tidak ada perubahan)
+// About Page Component
 function AboutPage() {
   return (
     <div className="min-h-screen bg-gray-50">
@@ -527,7 +532,6 @@ function AboutPage() {
     </div>
   );
 }
-
 
 // Updated History Page Component
 function HistoryPage() {
@@ -612,7 +616,7 @@ function HistoryPage() {
                       <div className="text-lg font-semibold text-green-600">
                         {(item.confidence * 100).toFixed(1)}%
                       </div>
-                      <div className="text-sm text-gray-500">Confidence</div>
+                      <div className="text-sm text-gray-500">Akurasi</div>
                     </div>
                   </div>
                 ))}

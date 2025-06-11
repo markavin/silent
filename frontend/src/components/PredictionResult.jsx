@@ -6,9 +6,9 @@ const PredictionResult = ({ result }) => {
 
   // Get confidence level and styling
   const getConfidenceLevel = (confidence) => {
-    if (confidence >= 0.8) return { level: 'high', color: 'green', label: 'High' }
-    if (confidence >= 0.6) return { level: 'medium', color: 'yellow', label: 'Medium' }
-    return { level: 'low', color: 'red', label: 'Low' }
+    if (confidence >= 0.8) return { level: 'Tinggi', color: 'green', label: 'Tinggi' }
+    if (confidence >= 0.6) return { level: 'Tengah', color: 'yellow', label: 'Tengah' }
+    return { level: 'Rendah', color: 'red', label: 'Rendah' }
   }
 
   const getConfidenceIcon = (confidence) => {
@@ -22,7 +22,7 @@ const PredictionResult = ({ result }) => {
       <div className="bg-red-50 border border-red-200 rounded-lg p-6">
         <div className="flex items-center gap-3 mb-3">
           <XCircle className="w-6 h-6 text-red-500" />
-          <h3 className="text-lg font-semibold text-red-800">Prediction Failed</h3>
+          <h3 className="text-lg font-semibold text-red-800">Prediksi gagal</h3>
         </div>
         <p className="text-red-700">{result.error || 'An error occurred during prediction'}</p>
         
@@ -55,10 +55,10 @@ const PredictionResult = ({ result }) => {
           </div>
           <div>
             <h3 className="text-2xl font-bold text-gray-800">
-              Letter "{result.prediction}"
+              Huruf "{result.prediction}"
             </h3>
             <p className="text-gray-600">
-              {result.dataset || result.language_type || 'Sign Language'} Recognition
+              {result.dataset || result.language_type || 'Sign Language'} Pengakuan
             </p>
           </div>
         </div>
@@ -67,7 +67,7 @@ const PredictionResult = ({ result }) => {
           {getConfidenceIcon(confidence)}
           <div className="text-right">
             <div className="font-medium">{confidenceInfo.label}</div>
-            <div className="text-sm">Confidence</div>
+            <div className="text-sm">akurasi</div>
           </div>
         </div>
       </div>
@@ -75,7 +75,7 @@ const PredictionResult = ({ result }) => {
       {/* Confidence Bar */}
       <div className="mb-4">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-gray-700">Confidence Score</span>
+          <span className="text-sm font-medium text-gray-700">akurasi score</span>
           <span className="text-sm font-bold text-gray-800">{(confidence * 100).toFixed(1)}%</span>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-3">
@@ -122,19 +122,19 @@ const PredictionResult = ({ result }) => {
 
       {/* Confidence Interpretation */}
       <div className="bg-white bg-opacity-50 rounded-lg p-4 mb-4">
-        <h4 className="font-medium text-gray-800 mb-2">Interpretation:</h4>
+        <h4 className="font-medium text-gray-800 mb-2">Interpretasi:</h4>
         <p className="text-sm text-gray-700">
-          {confidence >= 0.9 && "Excellent! The model is very confident about this prediction."}
-          {confidence >= 0.8 && confidence < 0.9 && "Great! The model is confident about this prediction."}
-          {confidence >= 0.6 && confidence < 0.8 && "Good! The model is reasonably confident, but you might want to try again for better accuracy."}
-          {confidence < 0.6 && "The model has low confidence. Consider improving the image quality or hand positioning."}
+          {confidence >= 0.9 && "Luar biasa! Model tersebut sangat yakin dengan prediksi ini."}
+          {confidence >= 0.8 && confidence < 0.9 && "Bagus! Model tersebut yakin dengan prediksi ini."}
+          {confidence >= 0.6 && confidence < 0.8 && "Bagus! Modelnya cukup meyakinkan, tetapi Anda mungkin ingin mencoba lagi untuk mendapatkan akurasi yang lebih baik."}
+          {confidence < 0.6 && "Model tersebut kurang percaya diri. Pertimbangkan untuk meningkatkan kualitas gambar atau posisi tangan."}
         </p>
       </div>
 
       {/* Alternative Predictions */}
       {result.all_predictions && Object.keys(result.all_predictions).length > 1 && (
         <div className="mb-4 p-3 bg-white bg-opacity-50 rounded-lg">
-          <h4 className="font-medium text-gray-800 mb-2">Alternative Predictions:</h4>
+          <h4 className="font-medium text-gray-800 mb-2">INterpretasi alternatif:</h4>
           <div className="space-y-2">
             {Object.entries(result.all_predictions).map(([dataset, pred]) => (
               <div key={dataset} className="flex items-center justify-between text-sm">
@@ -157,7 +157,7 @@ const PredictionResult = ({ result }) => {
           }}
           className="btn-secondary text-sm flex-1"
         >
-          📋 Copy Result
+          📋 Salin Hasil
         </button>
         <button 
           onClick={() => {
@@ -174,7 +174,7 @@ const PredictionResult = ({ result }) => {
           }}
           className="btn-secondary text-sm flex-1"
         >
-          📤 Share
+          📤 Bagikan
         </button>
       </div>
     </div>

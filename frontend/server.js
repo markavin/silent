@@ -7,9 +7,12 @@ const bodyParser = require('body-parser');
 require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const PORT = process.env.PORT || 3000;
 
-// Configure multer for file uploads
+
+const API_BASE_URL = process.env.VITE_API_BASE_URL || 'https://silenbek-production.up.railway.app';
+
+
 const storage = multer.memoryStorage();
 const upload = multer({ 
     storage: storage,
@@ -27,7 +30,14 @@ const upload = multer({
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: [
+        'http://localhost:3000',
+        'https://silenbek-production.up.railway.app',
+        'https://your-frontend-domain.com' // Add your frontend domain here
+    ],
+    credentials: true
+}));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
@@ -50,31 +60,48 @@ app.get('/health', (req, res) => {
         status: 'healthy',
         service: 'SILENT Frontend',
         timestamp: new Date().toISOString(),
-        port: PORT
+        port: PORT,
+        backend_url: API_BASE_URL
     });
 });
 
 // API proxy endpoints
 app.get('/api/health', async (req, res) => {
     try {
-        const response = await axios.get(`${API_BASE_URL}/health`);
+        console.log('Checking backend health at:', `${API_BASE_URL}/api/health`);
+        const response = await axios.get(`${API_BASE_URL}/api/health`, {
+            timeout: 10000, // 10 second timeout
+            headers: {
+                'User-Agent': 'SILENT-Frontend/1.0'
+            }
+        });
         res.json(response.data);
     } catch (error) {
+        console.error('Backend health check failed:', error.message);
         res.status(500).json({
             error: 'Backend API not available',
-            message: error.message
+            message: error.message,
+            backend_url: API_BASE_URL
         });
     }
 });
 
 app.get('/api/models', async (req, res) => {
     try {
-        const response = await axios.get(`${API_BASE_URL}/models`);
+        console.log('Getting models from:', `${API_BASE_URL}/api/models`);
+        const response = await axios.get(`${API_BASE_URL}/api/models`, {
+            timeout: 10000,
+            headers: {
+                'User-Agent': 'SILENT-Frontend/1.0'
+            }
+        });
         res.json(response.data);
     } catch (error) {
+        console.error('Failed to get model info:', error.message);
         res.status(500).json({
             error: 'Failed to get model info',
-            message: error.message
+            message: error.message,
+            backend_url: API_BASE_URL
         });
     }
 });
@@ -91,6 +118,14 @@ app.post('/api/predict', upload.single('image'), async (req, res) => {
 
         const { dataset_type } = req.body;
 
+        console.log(' Making prediction request to:', `${API_BASE_URL}/api/translate`);
+        console.log('Request params:', { 
+            hasImage: !!req.file, 
+            dataset_type,
+            imageSize: req.file.size,
+            imageType: req.file.mimetype
+        });
+
         // Create form data for backend API
         const FormData = require('form-data');
         const formData = new FormData();
@@ -105,26 +140,30 @@ app.post('/api/predict', upload.single('image'), async (req, res) => {
         }
 
         // Send to backend API
-        const response = await axios.post(`${API_BASE_URL}/predict`, formData, {
+        const response = await axios.post(`${API_BASE_URL}/api/translate`, formData, {
             headers: {
                 ...formData.getHeaders(),
-                'Content-Length': formData.getLengthSync()
+                'Content-Length': formData.getLengthSync(),
+                'User-Agent': 'SILENT-Frontend/1.0'
             },
             timeout: 30000 // 30 second timeout
         });
 
+        console.log('Prediction successful:', response.data);
         res.json(response.data);
 
     } catch (error) {
         console.error('Prediction error:', error.message);
         
         if (error.response) {
+            console.error('Backend error response:', error.response.data);
             res.status(error.response.status).json(error.response.data);
         } else {
             res.status(500).json({
                 success: false,
                 error: 'Failed to process prediction',
-                message: error.message
+                message: error.message,
+                backend_url: API_BASE_URL
             });
         }
     }
@@ -142,35 +181,76 @@ app.post('/api/predict/batch', upload.array('images', 10), async (req, res) => {
 
         const { dataset_type } = req.body;
 
-        // Create form data for backend API
-        const FormData = require('form-data');
-        const formData = new FormData();
-        
-        // Add all files
-        req.files.forEach(file => {
-            formData.append('images', file.buffer, {
-                filename: file.originalname,
-                contentType: file.mimetype
-            });
+        console.log('📦 Making batch prediction request to:', `${API_BASE_URL}/api/translate`);
+        console.log('📋 Batch params:', { 
+            fileCount: req.files.length, 
+            dataset_type 
         });
+
+        // Process each image individually since backend doesn't have batch endpoint
+        const results = [];
         
-        if (dataset_type) {
-            formData.append('dataset_type', dataset_type);
+        for (let i = 0; i < req.files.length; i++) {
+            const file = req.files[i];
+            
+            try {
+                const FormData = require('form-data');
+                const formData = new FormData();
+                
+                formData.append('image', file.buffer, {
+                    filename: file.originalname,
+                    contentType: file.mimetype
+                });
+                
+                if (dataset_type) {
+                    formData.append('dataset_type', dataset_type);
+                }
+
+                const response = await axios.post(`${API_BASE_URL}/api/translate`, formData, {
+                    headers: {
+                        ...formData.getHeaders(),
+                        'Content-Length': formData.getLengthSync(),
+                        'User-Agent': 'SILENT-Frontend/1.0'
+                    },
+                    timeout: 30000
+                });
+
+                results.push({
+                    ...response.data,
+                    imageIndex: i,
+                    imageName: file.originalname,
+                    success: true
+                });
+
+                console.log(` Image ${i+1}/${req.files.length} processed successfully`);
+                
+            } catch (error) {
+                console.error(` Image ${i+1}/${req.files.length} failed:`, error.message);
+                results.push({
+                    success: false,
+                    error: error.message,
+                    imageIndex: i,
+                    imageName: file.originalname
+                });
+            }
+            
+            // Small delay between requests
+            if (i < req.files.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
         }
 
-        // Send to backend API
-        const response = await axios.post(`${API_BASE_URL}/predict/batch`, formData, {
-            headers: {
-                ...formData.getHeaders(),
-                'Content-Length': formData.getLengthSync()
-            },
-            timeout: 60000 // 60 second timeout for batch
+        const successfulResults = results.filter(r => r.success);
+        
+        res.json({
+            success: true,
+            results: results,
+            total: results.length,
+            successful: successfulResults.length
         });
 
-        res.json(response.data);
-
     } catch (error) {
-        console.error('Batch prediction error:', error.message);
+        console.error(' Batch prediction error:', error.message);
         
         if (error.response) {
             res.status(error.response.status).json(error.response.data);
@@ -178,7 +258,8 @@ app.post('/api/predict/batch', upload.array('images', 10), async (req, res) => {
             res.status(500).json({
                 success: false,
                 error: 'Failed to process batch prediction',
-                message: error.message
+                message: error.message,
+                backend_url: API_BASE_URL
             });
         }
     }
@@ -189,7 +270,15 @@ app.post('/api/load_model/:dataset_type', async (req, res) => {
     try {
         const { dataset_type } = req.params;
         
-        const response = await axios.post(`${API_BASE_URL}/load_model/${dataset_type}`);
+        console.log('🔄 Loading model:', dataset_type);
+        const response = await axios.post(`${API_BASE_URL}/api/load_model/${dataset_type}`, {}, {
+            timeout: 30000,
+            headers: {
+                'User-Agent': 'SILENT-Frontend/1.0'
+            }
+        });
+        
+        console.log('Model loaded successfully:', response.data);
         res.json(response.data);
 
     } catch (error) {
@@ -201,7 +290,8 @@ app.post('/api/load_model/:dataset_type', async (req, res) => {
             res.status(500).json({
                 success: false,
                 error: 'Failed to load model',
-                message: error.message
+                message: error.message,
+                backend_url: API_BASE_URL
             });
         }
     }
@@ -236,8 +326,19 @@ app.use((req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-    console.log(`🚀 SILENT Frontend Server running on http://localhost:${PORT}`);
-    console.log(`🔧 Backend API: ${API_BASE_URL}`);
-    console.log(`📁 Static files: ${path.join(__dirname, 'public')}`);
-    console.log(`📄 Templates: ${path.join(__dirname, 'views')}`);
+    console.log(`SILENT Frontend Server running on http://localhost:${PORT}`);
+    console.log(`Backend API: ${API_BASE_URL}`);
+    console.log(`Static files: ${path.join(__dirname, 'public')}`);
+    console.log(`Templates: ${path.join(__dirname, 'views')}`);
+    
+    // Test backend connection on startup
+    setTimeout(async () => {
+        try {
+            const response = await axios.get(`${API_BASE_URL}/api/health`, { timeout: 5000 });
+            console.log('Backend connection verified:', response.data.status);
+        } catch (error) {
+            console.warn('Backend connection failed:', error.message);
+            console.warn(' Make sure the backend is running at:', API_BASE_URL);
+        }
+    }, 2000);
 });

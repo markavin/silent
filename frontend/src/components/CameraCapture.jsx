@@ -547,10 +547,10 @@ const CameraCapture = ({ language, onPrediction }) => {
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold flex items-center gap-2">
           <Camera className="w-5 h-5 text-blue-600" />
-          Real-time Camera Translation
+          Terjemahan Kamera Waktu Nyata
           {isStreaming && (
             <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
-              Live
+              Siaran Langsung
             </span>
           )}
         </h3>
@@ -568,7 +568,7 @@ const CameraCapture = ({ language, onPrediction }) => {
               className="btn-primary flex items-center gap-2"
             >
               <Camera className="w-4 h-4" />
-              Start Camera
+              Mulai Kamera
             </button>
           ) : isLoading ? (
             <button
@@ -576,7 +576,7 @@ const CameraCapture = ({ language, onPrediction }) => {
               className="bg-gray-400 text-white px-4 py-2 rounded-lg flex items-center gap-2 cursor-not-allowed"
             >
               <Loader className="w-4 h-4 animate-spin" />
-              Starting...
+              Memulai...
             </button>
           ) : (
             <button
@@ -584,7 +584,7 @@ const CameraCapture = ({ language, onPrediction }) => {
               className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
             >
               <CameraOff className="w-4 h-4" />
-              Stop Camera
+              Berhenti Kamera
             </button>
           )}
         </div>
@@ -619,7 +619,7 @@ const CameraCapture = ({ language, onPrediction }) => {
             <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-100">
               <div className="text-center">
                 <Camera className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 font-medium mb-2">Camera Auto-Start</p>
+                <p className="text-gray-600 font-medium mb-2">Kamera Otomatis-Mulai</p>
                 <button 
                   onClick={startCamera}
                   disabled={isLoading}
@@ -637,7 +637,7 @@ const CameraCapture = ({ language, onPrediction }) => {
           <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg">
             <div className="text-center text-white">
               <Loader className="w-8 h-8 animate-spin mx-auto mb-2" />
-              <p>Predicting...</p>
+              <p>Prediksi...</p>
             </div>
           </div>
         )}
@@ -645,7 +645,7 @@ const CameraCapture = ({ language, onPrediction }) => {
         {isAutoCapture && (
           <div className="absolute top-4 left-4 bg-green-500 text-white px-3 py-1 rounded-full text-sm flex items-center gap-1">
             <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-            Auto Mode • Letters Auto-Added
+            Mode Otomatis • Huruf Otomatis-Tertambah
           </div>
         )}
 
@@ -653,14 +653,14 @@ const CameraCapture = ({ language, onPrediction }) => {
           <div className="absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center rounded-lg">
             <div className="text-center text-white">
               <div className="text-6xl font-bold mb-2">{countdown}</div>
-              <p className="text-lg">Get ready...</p>
+              <p className="text-lg">Bersiap...</p>
             </div>
           </div>
         )}
 
         {isMirrored && isStreaming && (
           <div className="absolute bottom-4 right-4 bg-blue-500 text-white px-2 py-1 rounded text-xs">
-            Mirror Mode
+            Mode Cermin
           </div>
         )}
       </div>
@@ -672,9 +672,9 @@ const CameraCapture = ({ language, onPrediction }) => {
         <div className="bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-200 rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
             <h4 className="font-bold text-green-900 flex items-center gap-2">
-              🔤 Live Letter Sequence
+              🔤 Urutan Huruf Langsung
               <span className="bg-green-100 text-green-600 text-xs px-2 py-1 rounded-full">
-                {letterSequence.filter(item => !item.isSpace).length} letters
+                {letterSequence.filter(item => !item.isSpace).length} Huruf
               </span>
             </h4>
             <div className="flex items-center gap-2">
@@ -738,10 +738,10 @@ const CameraCapture = ({ language, onPrediction }) => {
             
             {/* Statistics */}
             <p className="text-green-700 text-sm mb-3">
-              {letterSequence.filter(item => !item.isSpace).length} letters • {letterSequence.filter(item => item.isSpace).length} spaces
+              {letterSequence.filter(item => !item.isSpace).length} Huruf • {letterSequence.filter(item => item.isSpace).length} Spasi
               • Confidence: {letterSequence.length > 0 ? 
                 (letterSequence.filter(item => !item.isSpace).reduce((acc, item) => acc + item.confidence, 0) / 
-                letterSequence.filter(item => !item.isSpace).length * 100).toFixed(0) : 0}% avg
+                letterSequence.filter(item => !item.isSpace).length * 100).toFixed(0) : 0}% Rata-rata
             </p>
             
             {/* Action Buttons */}
@@ -751,14 +751,14 @@ const CameraCapture = ({ language, onPrediction }) => {
                 className="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-1"
               >
                 <Space className="w-3 h-3" />
-                Add Space
+                Tambah Spasi
               </button>
               <button
                 onClick={copySequenceText}
                 className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-1"
               >
                 <Copy className="w-3 h-3" />
-                Copy Text
+                Salin Text
               </button>
             </div>
           </div>
@@ -808,7 +808,7 @@ const CameraCapture = ({ language, onPrediction }) => {
                 title="Toggle Mirror Mode"
               >
                 <FlipHorizontal2 className="w-4 h-4" />
-                {isMirrored ? 'Mirror ON' : 'Mirror OFF'}
+                {isMirrored ? 'Cermin Nyala' : 'Cermin Mati'}
               </button>
             </div>
           </div>
@@ -828,7 +828,7 @@ const CameraCapture = ({ language, onPrediction }) => {
               ) : (
                 <Square className="w-4 h-4" />
               )}
-              {isCapturing ? 'Predicting...' : 'Capture Now'}
+              {isCapturing ? 'Predicting...' : 'Tangkap sekarang'}
             </button>
 
             <button
@@ -837,7 +837,7 @@ const CameraCapture = ({ language, onPrediction }) => {
               className="btn-secondary flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Timer className="w-4 h-4" />
-              Timer ({timerSeconds}s)
+              Tangkap Pengatur Waktu ({timerSeconds}s)
             </button>
 
             <button
@@ -852,12 +852,12 @@ const CameraCapture = ({ language, onPrediction }) => {
               {isAutoCapture ? (
                 <>
                   <Pause className="w-4 h-4" />
-                  Stop Auto
+                  Hentikan Otomatis
                 </>
               ) : (
                 <>
                   <Play className="w-4 h-4" />
-                  Auto Capture
+                  Tangkap Otomatis
                 </>
               )}
             </button>
@@ -868,9 +868,9 @@ const CameraCapture = ({ language, onPrediction }) => {
                 onChange={(e) => setTimerSeconds(Number(e.target.value))}
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
               >
-                <option value={3}>3 seconds</option>
-                <option value={5}>5 seconds</option>
-                <option value={10}>10 seconds</option>
+                <option value={3}>3 detik</option>
+                <option value={5}>5 detik</option>
+                <option value={10}>10 detik</option>
               </select>
             </div>
           </div>
@@ -903,19 +903,19 @@ const CameraCapture = ({ language, onPrediction }) => {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <h4 className="font-medium text-blue-900 mb-2">📋 Petunjuk Penggunaan:</h4>
         <ul className="text-blue-800 text-sm space-y-1">
-          <li>• <strong>Auto Letter Display:</strong> Huruf akan muncul otomatis di bawah kamera saat prediksi berhasil (min 20%)</li>
-          <li>• <strong>Auto Capture:</strong> Ambil foto otomatis setiap 3 detik - huruf langsung muncul</li>
-          <li>• <strong>Timer Capture:</strong> Countdown capture - huruf juga langsung muncul</li>
-          <li>• <strong>Manual Capture:</strong> Klik "Capture Now" - huruf akan ditambahkan otomatis</li>
-          <li>• <strong>Mirror Mode ON:</strong> Untuk tangan kiri (natural movement)</li>
-          <li>• <strong>Mirror Mode OFF:</strong> Untuk tangan kanan atau 2 tangan (BISINDO)</li>
+          <li>• <strong>Tampilan Huruf Otomatis:</strong> Huruf akan muncul otomatis di bawah kamera saat prediksi berhasil (min 20%)</li>
+          <li>• <strong>Tangkap Otomatis:</strong> Ambil foto otomatis setiap 3 detik - huruf langsung muncul</li>
+          <li>• <strong>Tangkap Pengatur Waktu:</strong> Countdown capture - huruf juga langsung muncul</li>
+          <li>• <strong>Tangkap Manual:</strong> Klik "Capture Now" - huruf akan ditambahkan otomatis</li>
+          <li>• <strong>Mode Cermin NYALA:</strong> Untuk tangan kiri (natural movement)</li>
+          <li>• <strong>Mode Cermin MATI:</strong> Untuk tangan kanan atau 2 tangan (BISINDO)</li>
           <li>• Confidence minimum 20% untuk ditambahkan ke sequence (sangat permisif)</li>
-          <li>• <strong>History Protection:</strong> Mencegah double entry di sidebar history</li>
+          <li>• <strong>Perlindungan Riwayat:</strong> Mencegah double entry di sidebar history</li>
           <li>• Cooldown history 1.5 detik + unique key system untuk semua mode</li>
           <li>• Cooldown global 2.5 detik + duplicate check 5 detik untuk semua mode</li>
           <li>• Mengabaikan "No hand detected" secara otomatis</li>
           <li>• Add Space tidak mengganggu prediksi selanjutnya</li>
-          <li>• Gunakan "Add Space", "Undo", dan "Copy" untuk kontrol sequence</li>
+          <li>• Gunakan "Tambah Spasi", "Batalkan", dan "Salin" untuk kontrol sequence</li>
           <li>• Huruf dengan dot hijau = otomatis dari Auto/Timer mode</li>
         </ul>
       </div>
