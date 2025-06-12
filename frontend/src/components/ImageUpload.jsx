@@ -257,8 +257,8 @@ const ImageUpload = ({ language, onPrediction }) => {
           addDebugLog(`Original dimensions: ${img.width}x${img.height}`)
           
           // Set canvas size - IDENTIK dengan camera preprocessing
-          canvas.width = img.width || 1280
-          canvas.height = img.height || 720
+          canvas.width = 640
+          canvas.height = 480
 
           addDebugLog(`Canvas set to: ${canvas.width}x${canvas.height}`)
 
