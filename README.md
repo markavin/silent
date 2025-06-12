@@ -1,57 +1,55 @@
 
-#Silent Frontend
+### Silent Frontend
 
 Proyek ini adalah bagian frontend dari aplikasi Silent, dibangun menggunakan alat pengembangan web modern. Proyek ini memanfaatkan teknologi seperti Vite, TailwindCSS, dan PostCSS untuk pengembangan yang cepat, bersama dengan ESLint untuk menjaga kualitas dan konsistensi kode.
 
 ## Struktur Proyek
 
 Folder proyek ini memiliki struktur sebagai berikut:
-silent-frontend-main/
-└── 🌐 FRONTEND FILES
-    └── frontend/                ← React application
+silent-frontend/
+└── FRONTEND FILES
+    └── frontend/                   ← React application root
         ├── src/
         │   ├── components/
-        │   │   ├── CameraCapture.jsx    ← Camera interface
-        │   │   ├── ImageUpload.jsx      ← Image upload
-        │   │   ├── Header.jsx           ← Navigation
-        │   │   ├── Footer.jsx           ← Footer
-        │   │   ├── LanguageSelector.jsx ← Language picker
-        │   │   ├── PredictionResult.jsx ← Results display
-        │   │   └── ModelInfo.jsx        ← Model information
-        │   │   └── DebugPanel.jsx
-        │   │   └── YoutubeEmbed.jsx
+        │   │   ├── CameraCapture.jsx     ← Kamera real-time
+        │   │   ├── ImageUpload.jsx       ← Upload gambar
+        │   │   ├── Header.jsx            ← Navigasi atas
+        │   │   ├── Footer.jsx            ← Footer aplikasi
+        │   │   ├── LanguageSelector.jsx  ← Pilih bahasa
+        │   │   ├── PredictionResult.jsx  ← Tampilkan hasil prediksi
+        │   │   ├── ModelInfo.jsx         ← Info model ML
+        │   │   ├── DebugPanel.jsx        ← Debugging tools (opsional)
+        │   │   └── YoutubeEmbed.jsx      ← Embed video YouTube
         │   ├── services/
-        │   │   └── apiService.js        ← API communication
-        │   │
+        │   │   └── apiService.js         ← Komunikasi API ke backend
         │   ├── utils/
-        │   │   └── cameraUtils.js       ← Camera utilities
-        │   │
-        │   ├── assets/                  ← Images, icons
-        │   ├── App.jsx                  ← Main app component
-        │   ├── main.jsx                 ← React entry point
-        │   └── index.css                ← Styles
-        │
-        ├── index.html               ← HTML template
-        ├── package.json             ← Node.js dependencies
-        ├── tailwind.config.js       ← CSS framework config
-        ├── vite.config.js           ← Build tool config
-        ├── server.js                ← Frontend dev server
-        ├── .eslintrc.cjs
-        ├── package-lock.json
-        ├── postcss.config.js
-        ├── vercel.json
-        └── .gitignore
+        │   │   └── cameraUtils.js        ← Utilitas kamera
+        │   ├── assets/                   ← Gambar, ikon, dll
+        │   ├── App.jsx                   ← Komponen utama aplikasi
+        │   ├── main.jsx                  ← Entry point React
+        │   └── index.css                 ← Styling utama
+        ├── index.html                    ← Template HTML
+        ├── package.json                  ← Dependensi Node.js
+        ├── package-lock.json             ← Lockfile dependensi
+        ├── tailwind.config.js            ← Konfigurasi Tailwind CSS
+        ├── postcss.config.js             ← Konfigurasi PostCSS
+        ├── vite.config.js                ← Konfigurasi Vite
+        ├── server.js                     ← Server dev frontend
+        ├── vercel.json                   ← Konfigurasi deployment Vercel
+        ├── .eslintrc.cjs                 ← Konfigurasi ESLint
+        └── .gitignore                    ← Daftar file yang diabaikan Git
+
         
 ## Instalasi
 
 Ikuti langkah-langkah berikut untuk mengatur proyek secara lokal.
 
-### Prasyarat
+## Prasyarat
 
 - Node.js (v16 atau lebih baru)
 - npm (v7 atau lebih baru)
 
-### Langkah-langkah
+## Langkah-langkah
 
 1. Clone repositori:
    ```bash
