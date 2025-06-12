@@ -909,14 +909,6 @@ const CameraCapture = ({ language, onPrediction }) => {
           <li>• <strong>Tangkap Manual:</strong> Klik "Capture Now" - huruf akan ditambahkan otomatis</li>
           <li>• <strong>Mode Cermin NYALA:</strong> Untuk tangan kiri (natural movement)</li>
           <li>• <strong>Mode Cermin MATI:</strong> Untuk tangan kanan atau 2 tangan (BISINDO)</li>
-          <li>• Confidence minimum 20% untuk ditambahkan ke sequence (sangat permisif)</li>
-          <li>• <strong>Perlindungan Riwayat:</strong> Mencegah double entry di sidebar history</li>
-          <li>• Cooldown history 1.5 detik + unique key system untuk semua mode</li>
-          <li>• Cooldown global 2.5 detik + duplicate check 5 detik untuk semua mode</li>
-          <li>• Mengabaikan "No hand detected" secara otomatis</li>
-          <li>• Add Space tidak mengganggu prediksi selanjutnya</li>
-          <li>• Gunakan "Tambah Spasi", "Batalkan", dan "Salin" untuk kontrol sequence</li>
-          <li>• Huruf dengan dot hijau = otomatis dari Auto/Timer mode</li>
         </ul>
       </div>
     </div>
