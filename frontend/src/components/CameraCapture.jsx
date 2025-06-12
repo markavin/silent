@@ -892,12 +892,12 @@ const CameraCapture = ({ language, onPrediction }) => {
 
       {/* Instructions */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h4 className="font-medium text-blue-900 mb-2">📋 Petunjuk Penggunaan:</h4>
+        <h4 className="font-medium text-blue-900 mb-2">Petunjuk Penggunaan:</h4>
         <ul className="text-blue-800 text-sm space-y-1">
-          <li>• <strong>Auto Letter Display:</strong> Huruf akan muncul otomatis saat prediksi berhasil (min 20%)</li>
-          <li>• <strong>Auto Capture:</strong> Ambil foto otomatis setiap 3 detik - huruf langsung muncul</li>
-          <li>• <strong>Timer Capture:</strong> Countdown capture - huruf juga langsung muncul</li>
-          <li>• <strong>Manual Capture:</strong> Klik "Capture Now" - huruf akan ditambahkan otomatis</li>
+          <li>• <strong>Mirror ON:</strong> Tampilan cermin untuk selfie atau teks terbalik</li>
+          <li>• <strong>Auto Capture:</strong> Foto otomatis setiap 3 detik</li>
+          <li>• <strong>Timer Capture:</strong> Countdown sebelum foto diambil</li>
+          <li>• <strong>Manual Capture:</strong> Klik "Capture Now" untuk foto langsung</li>
         </ul>
       </div>
     </div>
