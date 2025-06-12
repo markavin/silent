@@ -7,8 +7,8 @@ Proyek ini adalah bagian frontend dari aplikasi **SILENT**, dibangun menggunakan
 Berikut adalah struktur folder proyek dalam format pohon direktori:
 
 ```bash
-silent-frontend-main/
-└── 🌐 FRONTEND FILES
+silent-frontend/
+└── FRONTEND FILES
     └── frontend/                     ← Root aplikasi React
         ├── src/
         │   ├── components/           ← Komponen UI
