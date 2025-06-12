@@ -25,19 +25,6 @@ const PredictionResult = ({ result }) => {
           <h3 className="text-lg font-semibold text-red-800">Prediksi gagal</h3>
         </div>
         <p className="text-red-700">{result.error || 'An error occurred during prediction'}</p>
-        
-        {/* Troubleshooting Tips */}
-        <div className="mt-4 p-3 bg-red-100 rounded-lg">
-          <h4 className="font-medium text-red-800 mb-2">Troubleshooting Tips:</h4>
-          <ul className="text-red-700 text-sm space-y-1">
-            <li>• Ensure the hand is clearly visible in the image</li>
-            <li>• Check if the lighting is adequate</li>
-            <li>• Make sure the image is not blurry</li>
-            <li>• Try a different angle or hand position</li>
-            <li>• For BISINDO: try using both hands</li>
-            <li>• For SIBI: use single hand gestures</li>
-          </ul>
-        </div>
       </div>
     )
   }
