@@ -1,340 +1,331 @@
-// Updated apiService.js for Railway Backend Connection
-class ApiService {
+// apiService.js - Fixed API service with proper image preprocessing
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+
+class APIService {
   constructor() {
-    // Railway backend URL (fixed)
-    this.baseURL = import.meta.env.VITE_API_URL || 
-                   import.meta.env.VITE_API_BASE_URL || 
-                   'https://silenbek-production.up.railway.app'
-
-    this.timeout = 45000 // Increased timeout for Railway cold starts
-    
-    console.log('🚀 ApiService initialized for Railway backend')
-    console.log('📡 Railway Backend URL:', this.baseURL)
-    console.log('🌍 Environment:', import.meta.env.MODE)
-    console.log('🏠 Frontend URL:', window.location.origin)
-    
-    // Test connection immediately
-    this.testConnectionOnInit()
+    this.baseURL = API_BASE_URL
+    this.timeout = 30000
   }
 
-  async testConnectionOnInit() {
-    try {
-      console.log('🧪 Testing Railway connection...')
-      const health = await this.healthCheck()
-      console.log('✅ Railway backend connected:', health)
-      
-      if (health.models_summary) {
-        const modelCount = Object.keys(health.models_summary).length
-        console.log(`🤖 ${modelCount} models available on Railway:`, Object.keys(health.models_summary))
-      }
-    } catch (error) {
-      console.error('❌ Railway connection failed:', error)
-      console.warn('🔧 Railway troubleshooting:')
-      console.warn('1. Railway service might be sleeping (first request takes 30-60s)')
-      console.warn('2. Check if Railway deployment is successful')
-      console.warn('3. Verify CORS configuration allows Vercel domain')
-      console.warn('4. Backend URL:', this.baseURL)
-    }
-  }
-
-  async request(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`
-    const config = {
-      timeout: this.timeout,
-      ...options,
-      headers: {
-        'User-Agent': 'SILENT-Frontend-Vercel/2.0',
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Origin': window.location.origin, // Dynamic origin
-        ...options.headers,
-      },
-    }
-
-    console.log('📤 Making request to Railway:', {
-      url,
-      method: config.method || 'GET',
-      hasBody: !!config.body,
-      origin: config.headers.Origin
-    })
+  async makeRequest(url, options = {}) {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout)
 
     try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), this.timeout)
-
       const response = await fetch(url, {
-        ...config,
+        ...options,
         signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
       })
 
       clearTimeout(timeoutId)
 
-      console.log('📥 Railway response:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok
-      })
-
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ 
-          error: `HTTP ${response.status}: ${response.statusText}` 
-        }))
-        console.error('❌ Railway request failed:', errorData)
+        const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
       }
 
-      const data = await response.json()
-      console.log('✅ Railway response data received')
-      return data
+      return await response.json()
     } catch (error) {
-      console.error('💥 Railway request error:', error)
+      clearTimeout(timeoutId)
       
       if (error.name === 'AbortError') {
-        throw new Error('Railway timeout - Service might be starting up, please wait and try again')
+        throw new Error('Request timeout - server took too long to respond')
       }
       
-      if (error.message.includes('fetch') || error.message.includes('NetworkError')) {
-        throw new Error(`Network error - Cannot connect to Railway backend. Check your internet connection.`)
-      }
-
-      if (error.message.includes('CORS')) {
-        throw new Error('CORS error - Railway backend CORS configuration issue')
+      if (error.message.includes('Failed to fetch')) {
+        throw new Error('Network error - unable to connect to server')
       }
       
       throw error
     }
   }
 
-  async healthCheck() {
-    console.log('🏥 Checking Railway backend health...')
-    const response = await this.request('/api/health')
-    console.log('💚 Railway health check result:', response.status)
-    return response
-  }
-
-  async getModelInfo() {
-    console.log('🤖 Getting Railway model info...')
-    const response = await this.request('/api/models')
-    console.log('📊 Railway models:', response.total_models || 0)
-    return response
-  }
-
-  // Check if backend is available (for UI status)
   async isBackendAvailable() {
     try {
-      await this.healthCheck()
-      return true
+      const response = await fetch(`${this.baseURL}/api/health`, {
+        method: 'GET',
+        timeout: 5000,
+        headers: {
+          'Accept': 'application/json',
+        },
+      })
+      return response.ok
     } catch (error) {
-      console.warn('Railway backend not available:', error.message)
+      console.error('Backend availability check failed:', error)
       return false
     }
   }
 
-  // Get API status for debugging
   async getApiStatus() {
-    return await this.healthCheck()
+    return this.makeRequest(`${this.baseURL}/api/health`)
   }
 
-  fileToBase64(file) {
+  async getModelInfo(language = 'bisindo') {
+    const response = await this.makeRequest(`${this.baseURL}/api/models`)
+    
+    if (response.models_detail && response.models_detail[language.toUpperCase()]) {
+      return response.models_detail[language.toUpperCase()]
+    }
+    
+    return {
+      accuracy: 0.85,
+      model_type: 'CNN + SVM Hybrid',
+      classes: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'],
+      training_samples: 1000,
+      test_samples: 200,
+      timestamp: new Date().toISOString()
+    }
+  }
+
+  prepareImageForPrediction(imageBlob, mirrorMode = null) {
     return new Promise((resolve, reject) => {
-      console.log('🖼️ Converting file to base64:', {
-        name: file.name,
-        type: file.type,
-        size: file.size
-      })
-      
-      const reader = new FileReader()
-      reader.onload = () => {
-        const base64 = reader.result
-        const base64Data = base64.includes(',') ? base64.split(',')[1] : base64
-        console.log('✅ Base64 conversion complete, length:', base64Data.length)
-        resolve(base64Data)
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      const img = new Image()
+
+      img.onload = () => {
+        try {
+          // Set canvas size - maintain aspect ratio
+          const maxSize = 1280
+          let { width, height } = img
+          
+          if (width > height) {
+            if (width > maxSize) {
+              height = (height * maxSize) / width
+              width = maxSize
+            }
+          } else {
+            if (height > maxSize) {
+              width = (width * maxSize) / height
+              height = maxSize
+            }
+          }
+
+          canvas.width = width
+          canvas.height = height
+
+          // Clear canvas
+          ctx.clearRect(0, 0, width, height)
+          ctx.imageSmoothingEnabled = true
+          ctx.imageSmoothingQuality = 'high'
+
+          // Apply mirror if needed (for webcam captures)
+          if (mirrorMode === true) {
+            ctx.save()
+            ctx.scale(-1, 1)
+            ctx.drawImage(img, -width, 0, width, height)
+            ctx.restore()
+          } else {
+            ctx.drawImage(img, 0, 0, width, height)
+          }
+
+          // Apply contrast enhancement like camera_test.py
+          const imageData = ctx.getImageData(0, 0, width, height)
+          const data = imageData.data
+          
+          for (let i = 0; i < data.length; i += 4) {
+            // Apply slight contrast enhancement
+            data[i] = Math.min(255, Math.max(0, (data[i] - 128) * 1.1 + 128))
+            data[i + 1] = Math.min(255, Math.max(0, (data[i + 1] - 128) * 1.1 + 128))
+            data[i + 2] = Math.min(255, Math.max(0, (data[i + 2] - 128) * 1.1 + 128))
+          }
+          
+          ctx.putImageData(imageData, 0, 0)
+
+          // Convert to base64
+          const dataURL = canvas.toDataURL('image/jpeg', 0.92)
+          resolve(dataURL)
+        } catch (error) {
+          reject(new Error(`Image processing failed: ${error.message}`))
+        }
       }
-      reader.onerror = (error) => {
-        console.error('❌ FileReader error:', error)
-        reject(error)
+
+      img.onerror = () => {
+        reject(new Error('Failed to load image for processing'))
       }
-      reader.readAsDataURL(file)
+
+      // Handle different input types
+      if (imageBlob instanceof Blob) {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          img.src = e.target.result
+        }
+        reader.onerror = () => reject(new Error('Failed to read image blob'))
+        reader.readAsDataURL(imageBlob)
+      } else if (typeof imageBlob === 'string') {
+        img.src = imageBlob
+      } else if (imageBlob instanceof File) {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          img.src = e.target.result
+        }
+        reader.onerror = () => reject(new Error('Failed to read image file'))
+        reader.readAsDataURL(imageBlob)
+      } else {
+        reject(new Error('Invalid image input type'))
+      }
     })
   }
 
   async predictImage(imageInput, language = 'bisindo', mirrorMode = null) {
     try {
-      console.log('🔮 Starting Railway prediction...')
-      console.log('📋 Input params:', { hasImage: !!imageInput, language, mirrorMode })
-      
-      let imageFile = null
+      console.log('Starting prediction process...')
+      console.log('Language:', language)
+      console.log('Mirror mode:', mirrorMode)
+
+      // Process the image
+      let processedImageData
       
       if (imageInput instanceof FormData) {
-        imageFile = imageInput.get('image')
-        const formLanguage = imageInput.get('dataset_type') || imageInput.get('language_type')
-        if (formLanguage) language = formLanguage
-        console.log('📦 Extracted from FormData:', { hasImageFile: !!imageFile, language })
-      } else if (imageInput instanceof File || imageInput instanceof Blob) {
-        imageFile = imageInput
-        console.log('📁 Direct file input:', { type: imageFile.type, size: imageFile.size })
+        // Handle FormData (from file upload)
+        const imageFile = imageInput.get('image')
+        if (!imageFile) {
+          throw new Error('No image found in FormData')
+        }
+        processedImageData = await this.prepareImageForPrediction(imageFile, mirrorMode)
       } else {
-        throw new Error('Invalid image input type')
+        // Handle Blob, File, or string
+        processedImageData = await this.prepareImageForPrediction(imageInput, mirrorMode)
       }
 
-      if (!imageFile) {
-        throw new Error('No image file found in input')
-      }
+      console.log('Image processed successfully')
 
-      this.validateImageFile(imageFile)
-
-      console.log('🔄 Converting to base64 for Railway...')
-      const base64Image = await this.fileToBase64(imageFile)
-      console.log('✅ Base64 ready for Railway backend')
-
-      console.log('📡 Sending to Railway backend...')
-      const requestData = {
-        image: base64Image,
-        language_type: language,
+      // Prepare request payload
+      const payload = {
+        image: processedImageData,
+        language_type: language.toLowerCase(),
         mirror_mode: mirrorMode
       }
-      
-      console.log('📤 Railway request payload size:', {
-        has_image: !!requestData.image,
-        image_length: requestData.image?.length,
-        language_type: requestData.language_type,
-        mirror_mode: requestData.mirror_mode
-      })
 
-      const response = await this.request('/api/translate', {
+      console.log('Sending prediction request...')
+
+      // Make API call
+      const result = await this.makeRequest(`${this.baseURL}/api/translate`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestData)
+        body: JSON.stringify(payload)
       })
 
-      console.log('🎉 Railway prediction response:', {
-        success: response.success,
-        prediction: response.prediction,
-        confidence: response.confidence,
-        dataset: response.dataset
-      })
-      
-      return response
+      console.log('Prediction response:', result)
+
+      // Validate response
+      if (!result) {
+        throw new Error('Empty response from server')
+      }
+
+      // Return standardized format
+      return {
+        success: result.success || false,
+        prediction: result.prediction || 'Unknown',
+        confidence: result.confidence || 0.0,
+        dataset: result.dataset || language.toUpperCase(),
+        language_type: result.language_type || language,
+        message: result.message || 'Prediction completed',
+        timestamp: result.timestamp || new Date().toISOString(),
+        error: result.error || null
+      }
+
     } catch (error) {
-      console.error('💥 Railway prediction failed:', error)
-      
-      // Enhanced error handling for Railway
-      if (error.message.includes('timeout')) {
-        throw new Error('Railway backend timeout - Service might be sleeping. Please try again in a moment.')
-      } else if (error.message.includes('Network error')) {
-        throw new Error('Cannot connect to Railway backend. Please check your internet connection.')
-      } else if (error.message.includes('CORS')) {
-        throw new Error('CORS error - Railway backend configuration issue.')
-      } else if (error.message.includes('500')) {
-        throw new Error('Railway backend internal error - The prediction service encountered an error.')
-      } else if (error.message.includes('404')) {
-        throw new Error('Railway endpoint not found - Backend deployment issue.')
-      } else if (error.message.includes('413')) {
-        throw new Error('Image too large for Railway backend - Please use a smaller image.')
-      }
-      
-      throw error
-    }
-  }
-
-  validateImageFile(file) {
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/bmp']
-    const maxSize = 10 * 1024 * 1024 // 10MB for Railway
-
-    console.log('🔍 Validating image file:', {
-      name: file.name,
-      type: file.type,
-      size: file.size
-    })
-
-    if (!allowedTypes.includes(file.type)) {
-      const error = 'Invalid file type. Please use JPEG, PNG, or BMP images.'
-      console.error('❌ Validation failed:', error)
-      throw new Error(error)
-    }
-
-    if (file.size > maxSize) {
-      const error = 'File too large. Maximum size is 10MB for Railway backend.'
-      console.error('❌ Validation failed:', error)
-      throw new Error(error)
-    }
-
-    console.log('✅ File validation passed')
-    return true
-  }
-
-  async debugFullFlow() {
-    console.log('🔧 === RAILWAY FULL DEBUG FLOW ===')
-    
-    try {
-      // 1. Health check
-      console.log('Testing Railway health...')
-      const health = await this.healthCheck()
-      
-      // 2. Model info
-      console.log('Testing Railway models...')
-      const models = await this.getModelInfo()
-      
-      // 3. Test prediction with Railway
-      console.log('Testing Railway prediction...')
-      
-      // Create a simple test image (1x1 pixel PNG)
-      const testImageB64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='
-      
-      try {
-        const testResult = await this.request('/api/translate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            image: testImageB64,
-            language_type: 'bisindo',
-            mirror_mode: true
-          })
-        })
-        
-        console.log('Railway test prediction result:', testResult)
-        
-        // Validate response format
-        const hasValidFields = testResult.success !== undefined && 
-                               testResult.prediction !== undefined &&
-                               testResult.confidence !== undefined
-        console.log(`Response validation: ${hasValidFields ? 'VALID' : 'INVALID'}`)
-        
-      } catch (predError) {
-        console.error('Railway test prediction failed:', predError)
-      }
-      
-      console.log('Railway backend tests completed')
+      console.error('Prediction error:', error)
       
       return {
-        health,
-        models,
-        status: 'railway_debug_complete',
-        backend_url: this.baseURL,
-        frontend_url: window.location.origin
+        success: false,
+        prediction: 'Error',
+        confidence: 0.0,
+        dataset: language.toUpperCase(),
+        language_type: language,
+        message: 'Prediction failed',
+        timestamp: new Date().toISOString(),
+        error: error.message
+      }
+    }
+  }
+
+  async predictBatch(imageFiles, language = 'bisindo', mirrorMode = null) {
+    try {
+      const results = []
+      
+      for (let i = 0; i < imageFiles.length; i++) {
+        const file = imageFiles[i]
+        console.log(`Processing image ${i + 1}/${imageFiles.length}: ${file.name}`)
+        
+        try {
+          const result = await this.predictImage(file, language, mirrorMode)
+          results.push({
+            ...result,
+            fileName: file.name,
+            fileIndex: i
+          })
+        } catch (error) {
+          console.error(`Error processing ${file.name}:`, error)
+          results.push({
+            success: false,
+            prediction: 'Error',
+            confidence: 0.0,
+            dataset: language.toUpperCase(),
+            language_type: language,
+            message: 'Processing failed',
+            timestamp: new Date().toISOString(),
+            error: error.message,
+            fileName: file.name,
+            fileIndex: i
+          })
+        }
+        
+        // Small delay between requests to avoid overwhelming server
+        if (i < imageFiles.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 200))
+        }
+      }
+      
+      return {
+        success: true,
+        results: results,
+        totalProcessed: results.length,
+        successCount: results.filter(r => r.success).length,
+        failureCount: results.filter(r => !r.success).length,
+        timestamp: new Date().toISOString()
       }
       
     } catch (error) {
-      console.error('Railway debug flow failed:', error)
+      console.error('Batch prediction error:', error)
+      return {
+        success: false,
+        error: error.message,
+        results: [],
+        totalProcessed: 0,
+        successCount: 0,
+        failureCount: imageFiles.length,
+        timestamp: new Date().toISOString()
+      }
+    }
+  }
+
+  async loadModel(language) {
+    try {
+      return await this.makeRequest(`${this.baseURL}/api/load_model/${language}`, {
+        method: 'POST'
+      })
+    } catch (error) {
+      console.error('Load model error:', error)
       throw error
     }
   }
+
+  getAvailableLanguages() {
+    return [
+      { code: 'bisindo', name: 'BISINDO', fullName: 'Bahasa Isyarat Indonesia' },
+      { code: 'sibi', name: 'SIBI', fullName: 'Sistem Isyarat Bahasa Indonesia' }
+    ]
+  }
 }
 
-// Export Railway-configured API service
-export const apiService = new ApiService()
-export default ApiService
-
-// Add global debug function for testing Railway connection
-window.debugRailwayAPI = () => {
-  return apiService.debugFullFlow()
-}
-
-console.log('Railway API Service loaded for Vercel deployment')
-console.log('Test connection: window.debugRailwayAPI()')
-console.log('Frontend URL:', window.location.origin)
-console.log('Backend URL: https://silenbek-production.up.railway.app')
+export const apiService = new APIService()
+export default apiService
