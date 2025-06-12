@@ -458,11 +458,11 @@ const CameraCapture = ({ language, onPrediction }) => {
       }
       setIsAutoCapture(false)
       predictionSourceRef.current = 'manual'
-      console.log('Tangkap Otomatis berhenti')
+      console.log('Auto capture stopped')
     } else {
       setIsAutoCapture(true)
       predictionSourceRef.current = 'auto'
-      console.log('Tangkap Otomatis mulai')
+      console.log('Auto capture started')
       
       autoIntervalRef.current = setInterval(() => {
         if (!isCapturing && isStreaming && backendStatus === 'connected') {
@@ -663,8 +663,9 @@ const CameraCapture = ({ language, onPrediction }) => {
         <div className="bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-200 rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
             <h4 className="font-bold text-green-900 flex items-center gap-2">
+              🔤 Live Letter Sequence
               <span className="bg-green-100 text-green-600 text-xs px-2 py-1 rounded-full">
-                {letterSequence.filter(item => !item.isSpace).length} huruf
+                {letterSequence.filter(item => !item.isSpace).length} letters
               </span>
             </h4>
             <div className="flex items-center gap-2">
@@ -712,10 +713,10 @@ const CameraCapture = ({ language, onPrediction }) => {
                         {(item.confidence * 100).toFixed(0)}%
                       </span>
                       {item.source === 'auto' && (
-                        <span className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full" title="Tangkap Otomatis"></span>
+                        <span className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full" title="Auto capture"></span>
                       )}
                       {item.source === 'timer' && (
-                        <span className="absolute -top-1 -right-1 w-3 h-3 bg-purple-500 rounded-full" title="Pengatur Waktu"></span>
+                        <span className="absolute -top-1 -right-1 w-3 h-3 bg-purple-500 rounded-full" title="Timer capture"></span>
                       )}
                       {item.source === 'manual' && (
                         <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full" title="Manual capture"></span>
@@ -741,14 +742,14 @@ const CameraCapture = ({ language, onPrediction }) => {
                 className="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-1"
               >
                 <Space className="w-3 h-3" />
-                Tambah spasi
+                Add Space
               </button>
               <button
                 onClick={copySequenceText}
                 className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-1"
               >
                 <Copy className="w-3 h-3" />
-                Salin text
+                Copy Text
               </button>
             </div>
           </div>
@@ -786,7 +787,7 @@ const CameraCapture = ({ language, onPrediction }) => {
         <div className="space-y-4">
           {/* Camera Settings */}
           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <span className="text-sm font-medium text-gray-700">Pengaturan Kamera</span>
+            <span className="text-sm font-medium text-gray-700">Camera Settings</span>
             <div className="flex items-center gap-2">
               <button
                 onClick={toggleMirror}
@@ -798,7 +799,7 @@ const CameraCapture = ({ language, onPrediction }) => {
                 title="Toggle Mirror Mode"
               >
                 <FlipHorizontal2 className="w-4 h-4" />
-                {isMirrored ? 'Cermin Aktif' : 'Cermin Non Aktif'}
+                {isMirrored ? 'Mirror ON' : 'Mirror OFF'}
               </button>
             </div>
           </div>
@@ -847,7 +848,7 @@ const CameraCapture = ({ language, onPrediction }) => {
               ) : (
                 <>
                   <Play className="w-4 h-4" />
-                  Tangkap Otomatis
+                  Auto Capture
                 </>
               )}
             </button>
@@ -858,9 +859,9 @@ const CameraCapture = ({ language, onPrediction }) => {
                 onChange={(e) => setTimerSeconds(Number(e.target.value))}
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
               >
-                <option value={3}>3 detik</option>
-                <option value={5}>5 detik</option>
-                <option value={10}>10 detik</option>
+                <option value={3}>3 seconds</option>
+                <option value={5}>5 seconds</option>
+                <option value={10}>10 seconds</option>
               </select>
             </div>
           </div>
@@ -883,7 +884,7 @@ const CameraCapture = ({ language, onPrediction }) => {
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <div className="flex items-center gap-2 text-red-700">
-            <span className="text-red-500">⚠️</span>
+            <span className="text-red-500">Error</span>
             <p className="text-sm">{error}</p>
           </div>
         </div>
@@ -893,10 +894,10 @@ const CameraCapture = ({ language, onPrediction }) => {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <h4 className="font-medium text-blue-900 mb-2">Petunjuk Penggunaan:</h4>
         <ul className="text-blue-800 text-sm space-y-1">
-          <li>• <strong>Mode Cermin:</strong> Tampilan cermin untuk selfie atau teks terbalik</li>
-          <li>• <strong>Tangkap Otomatis:</strong> Foto otomatis setiap 3 detik</li>
-          <li>• <strong>Pengatur Waktu:</strong> Countdown sebelum foto diambil</li>
-          <li>• <strong>Manual Capture:</strong> Klik "Capture Now" untuk foto langsung</li>
+          <li>• <strong>Auto Letter Display:</strong> Huruf akan muncul otomatis saat prediksi berhasil (min 20%)</li>
+          <li>• <strong>Auto Capture:</strong> Ambil foto otomatis setiap 3 detik - huruf langsung muncul</li>
+          <li>• <strong>Timer Capture:</strong> Countdown capture - huruf juga langsung muncul</li>
+          <li>• <strong>Manual Capture:</strong> Klik "Capture Now" - huruf akan ditambahkan otomatis</li>
         </ul>
       </div>
     </div>
