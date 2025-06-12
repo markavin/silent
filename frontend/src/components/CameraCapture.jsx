@@ -24,12 +24,15 @@ const CameraCapture = ({ language, onPrediction }) => {
   const [countdown, setCountdown] = useState(0)
   const [captureCount, setCaptureCount] = useState(0)
 
-  // Letter sequence system
+  // IMPROVED: Auto Letter Display System (Always Active)
   const [letterSequence, setLetterSequence] = useState([])
+  // GLOBAL: Track last prediction to prevent ANY double calls
   const lastPredictionRef = useRef(0)
   const isProcessingRef = useRef(false)
+  // GLOBAL: Track to prevent double history entries
   const lastHistoryRef = useRef(0)
   const sentToHistoryRef = useRef(new Set())
+  // CLEAN: Single source of truth for prediction calls
   const isTimerActiveRef = useRef(false)
   const predictionSourceRef = useRef('manual')
   const [sequenceHistory, setSequenceHistory] = useState([])
@@ -56,7 +59,7 @@ const CameraCapture = ({ language, onPrediction }) => {
       } else {
         console.log('Backend is not available')
         setBackendStatus('disconnected')
-        setError('Backend server tidak tersedia. Pastikan server Python berjalan.')
+        setError('Backend server tidak tersedia. Pastikan server Python berjalan di http://localhost:5000')
       }
     } catch (err) {
       console.error('Backend connectivity check failed:', err)
@@ -70,7 +73,7 @@ const CameraCapture = ({ language, onPrediction }) => {
     setIsLoading(true)
 
     try {
-      console.log('Requesting camera access...')
+      console.log('🎥 Requesting camera access...')
       
       if (!videoRef.current) {
         throw new Error('Video element not found')
@@ -101,7 +104,7 @@ const CameraCapture = ({ language, onPrediction }) => {
         const video = videoRef.current
         
         const onLoadedMetadata = () => {
-          console.log('Video ready:', {
+          console.log('📹 Video ready:', {
             width: video.videoWidth,
             height: video.videoHeight
           })
@@ -145,10 +148,10 @@ const CameraCapture = ({ language, onPrediction }) => {
       setIsStreaming(true)
       setIsLoading(false)
       
-      console.log('Camera ready!')
+      console.log('🎉 Camera ready!')
       
     } catch (err) {
-      console.error('Camera startup failed:', err)
+      console.error('❌ Camera startup failed:', err)
       
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop())
@@ -179,7 +182,7 @@ const CameraCapture = ({ language, onPrediction }) => {
   }
 
   const stopCamera = () => {
-    console.log('Stopping camera...')
+    console.log('🛑 Stopping camera...')
     
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop())
@@ -211,11 +214,12 @@ const CameraCapture = ({ language, onPrediction }) => {
       autoIntervalRef.current = null
     }
     
+    // CLEAN: Reset all flags
     isTimerActiveRef.current = false
     predictionSourceRef.current = 'manual'
     setCountdown(0)
     
-    console.log('All timers and flags reset')
+    console.log('🧹 CLEAN: All timers and flags reset')
   }
 
   const captureImage = useCallback(async () => {
@@ -232,7 +236,6 @@ const CameraCapture = ({ language, onPrediction }) => {
     ctx.imageSmoothingEnabled = true
     ctx.imageSmoothingQuality = 'high'
 
-    // Apply mirroring like camera_test.py
     if (isMirrored) {
       ctx.save()
       ctx.scale(-1, 1)
@@ -242,7 +245,6 @@ const CameraCapture = ({ language, onPrediction }) => {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
     }
 
-    // Apply contrast enhancement like camera_test.py
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
     const data = imageData.data
     
@@ -259,12 +261,13 @@ const CameraCapture = ({ language, onPrediction }) => {
     })
   }, [isStreaming, isMirrored])
 
+  // UNIVERSAL: Anti-double protection for ALL modes (Auto, Timer, Manual)
   const addLetterToSequence = (prediction, confidence) => {
     const currentTime = Date.now()
     
     // Universal cooldown for ALL modes
     if (currentTime - lastPredictionRef.current < 2500) {
-      console.log(`Cooldown active, skipping: ${prediction} (${currentTime - lastPredictionRef.current}ms ago)`)
+      console.log(`⏳ UNIVERSAL Cooldown active, skipping: ${prediction} (${currentTime - lastPredictionRef.current}ms ago)`)
       return false
     }
     
@@ -275,11 +278,11 @@ const CameraCapture = ({ language, onPrediction }) => {
     )
     
     if (recentSame) {
-      console.log(`Duplicate blocked: ${prediction} already exists in last 5 seconds`)
+      console.log(`🚫 UNIVERSAL DUPLICATE BLOCKED: ${prediction} already exists in last 5 seconds`)
       return false
     }
     
-    // Low confidence threshold
+    // Very low confidence threshold
     if (confidence >= 0.2) {
       const newLetter = {
         id: currentTime,
@@ -292,15 +295,15 @@ const CameraCapture = ({ language, onPrediction }) => {
       setSequenceHistory(prev => [...prev.slice(-9), [...letterSequence]])
       setLetterSequence(prev => {
         const newSequence = [...prev, newLetter]
-        console.log(`Letter added: ${prediction} (${(confidence * 100).toFixed(1)}%) from ${newLetter.source} mode - Total: ${newSequence.length}`)
+        console.log(`✅ UNIVERSAL ADD: ${prediction} (${(confidence * 100).toFixed(1)}%) from ${newLetter.source} mode - Total: ${newSequence.length}`)
         return newSequence
       })
       
       lastPredictionRef.current = currentTime
-      console.log(`Letter added universally: ${prediction} from ${newLetter.source} mode`)
+      console.log(`🎯 Letter added universally: ${prediction} from ${newLetter.source} mode`)
       return true
     } else {
-      console.log(`Confidence too low: ${prediction} (${(confidence * 100).toFixed(1)}%)`)
+      console.log(`❌ Confidence too low: ${prediction} (${(confidence * 100).toFixed(1)}%)`)
       return false
     }
   }
@@ -321,6 +324,7 @@ const CameraCapture = ({ language, onPrediction }) => {
     }
   }
 
+  // FIXED: Add space to sequence (don't affect prediction flow)
   const addSpaceToSequence = () => {
     const spaceItem = {
       id: Date.now(),
@@ -334,7 +338,8 @@ const CameraCapture = ({ language, onPrediction }) => {
     setSequenceHistory(prev => [...prev.slice(-9), [...letterSequence]])
     setLetterSequence(prev => [...prev, spaceItem])
     
-    console.log('Space added to sequence - prediction flow continues normally')
+    // DON'T update lastPredictionTime - this allows next prediction to work normally
+    console.log('✅ Space added to sequence - prediction flow continues normally')
   }
 
   const copySequenceText = () => {
@@ -343,6 +348,7 @@ const CameraCapture = ({ language, onPrediction }) => {
     alert('Text copied to clipboard!')
   }
 
+  // IMPROVED: Main prediction function with auto-sequence
   const predictFromCamera = useCallback(async () => {
     if (!isStreaming || !videoRef.current) return
 
@@ -373,21 +379,21 @@ const CameraCapture = ({ language, onPrediction }) => {
       setLastCapture(imageUrl)
 
       console.log('Sending to backend API...')
-      const result = await apiService.predictImage(imageBlob, language, isMirrored)
+      const result = await apiService.predictImage(imageBlob, language)
       
       console.log('Prediction result:', result)
       
-      // Add to sequence if successful
+      // SUPER STRICT: Only add once, with strong duplicate prevention
       if (result.success && result.prediction && result.prediction !== "No hand detected") {
-        console.log(`Attempting to add "${result.prediction}" (confidence: ${result.confidence})`)
+        console.log(`🎯 ATTEMPTING to add "${result.prediction}" (confidence: ${result.confidence})`)
         const wasAdded = addLetterToSequence(result.prediction, result.confidence)
-        console.log(`Add result: ${wasAdded ? 'SUCCESS' : 'BLOCKED'}`)
+        console.log(`📊 Add result: ${wasAdded ? 'SUCCESS' : 'BLOCKED'}`)
       } else {
-        console.log(`Skipped: success=${result.success}, prediction="${result.prediction}"`)
+        console.log(`❌ SKIPPED: success=${result.success}, prediction="${result.prediction}"`)
       }
       
-      // Send to parent for history
-      console.log(`Sending to history: ${result.prediction}`)
+      // Send to parent for history (this might be causing the double in history too)
+      console.log(`📤 Sending to history: ${result.prediction}`)
       onPrediction(result, imageUrl)
 
     } catch (err) {
@@ -396,7 +402,7 @@ const CameraCapture = ({ language, onPrediction }) => {
       let errorMessage = err.message || 'Failed to predict image'
       
       if (err.message.includes('Network error')) {
-        errorMessage = 'Tidak bisa menghubungi server. Pastikan backend Python berjalan.'
+        errorMessage = 'Tidak bisa menghubungi server. Pastikan backend Python berjalan di http://localhost:5000'
         setBackendStatus('disconnected')
       } else if (err.message.includes('timeout')) {
         errorMessage = 'Server terlalu lama merespons. Coba lagi.'
@@ -411,13 +417,15 @@ const CameraCapture = ({ language, onPrediction }) => {
     } finally {
       setIsCapturing(false)
     }
-  }, [isStreaming, captureImage, language, onPrediction, lastCapture, backendStatus, isAutoCapture, isMirrored])
+  }, [isStreaming, captureImage, language, onPrediction, lastCapture, backendStatus, isAutoCapture])
 
+  // CLEAN: Timer with explicit source tracking
   const startTimerCapture = () => {
     if (!isStreaming) return
     
+    // CLEAN: Prevent multiple timer instances
     if (isTimerActiveRef.current) {
-      console.log('Timer already active, ignoring')
+      console.log('⏰ TIMER: Already active, ignoring')
       return
     }
 
@@ -426,18 +434,18 @@ const CameraCapture = ({ language, onPrediction }) => {
     predictionSourceRef.current = 'timer'
     setCountdown(timerSeconds)
     
-    console.log(`Starting ${timerSeconds}s countdown`)
+    console.log(`⏰ TIMER: Starting ${timerSeconds}s countdown`)
     
     const timer = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) {
           clearInterval(timer)
-          console.log(`Countdown finished - calling prediction`)
+          console.log(`⏰ TIMER: Countdown finished - calling prediction`)
           
+          // CLEAN: Direct call with explicit source
           setTimeout(() => {
-            if (isTimerActiveRef.current) {
+            if (isTimerActiveRef.current) { // Double check timer is still active
               predictFromCamera('timer')
-              isTimerActiveRef.current = false
             }
           }, 200)
           
@@ -450,6 +458,7 @@ const CameraCapture = ({ language, onPrediction }) => {
     timerRef.current = timer
   }
 
+  // CLEAN: Auto capture with explicit source
   const toggleAutoCapture = () => {
     if (isAutoCapture) {
       if (autoIntervalRef.current) {
@@ -458,11 +467,11 @@ const CameraCapture = ({ language, onPrediction }) => {
       }
       setIsAutoCapture(false)
       predictionSourceRef.current = 'manual'
-      console.log('Auto capture stopped')
+      console.log('🤖 AUTO: Stopped')
     } else {
       setIsAutoCapture(true)
       predictionSourceRef.current = 'auto'
-      console.log('Auto capture started')
+      console.log('🤖 AUTO: Started')
       
       autoIntervalRef.current = setInterval(() => {
         if (!isCapturing && isStreaming && backendStatus === 'connected') {
@@ -479,7 +488,7 @@ const CameraCapture = ({ language, onPrediction }) => {
 
   // Auto-start camera when component mounts
   useEffect(() => {
-    console.log('Component mounted - checking video element...')
+    console.log('🚀 Component mounted - checking video element...')
     
     const checkAndStart = () => {
       if (videoRef.current) {
@@ -538,10 +547,10 @@ const CameraCapture = ({ language, onPrediction }) => {
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold flex items-center gap-2">
           <Camera className="w-5 h-5 text-blue-600" />
-          Real-time Camera Translation
+          Terjemahan Kamera Waktu Nyata
           {isStreaming && (
             <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
-              Live
+              Siaran Langsung
             </span>
           )}
         </h3>
@@ -559,7 +568,7 @@ const CameraCapture = ({ language, onPrediction }) => {
               className="btn-primary flex items-center gap-2"
             >
               <Camera className="w-4 h-4" />
-              Start Camera
+              Mulai Kamera
             </button>
           ) : isLoading ? (
             <button
@@ -567,7 +576,7 @@ const CameraCapture = ({ language, onPrediction }) => {
               className="bg-gray-400 text-white px-4 py-2 rounded-lg flex items-center gap-2 cursor-not-allowed"
             >
               <Loader className="w-4 h-4 animate-spin" />
-              Starting...
+              Memulai...
             </button>
           ) : (
             <button
@@ -575,7 +584,7 @@ const CameraCapture = ({ language, onPrediction }) => {
               className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
             >
               <CameraOff className="w-4 h-4" />
-              Stop Camera
+              Berhenti Kamera
             </button>
           )}
         </div>
@@ -610,7 +619,7 @@ const CameraCapture = ({ language, onPrediction }) => {
             <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-100">
               <div className="text-center">
                 <Camera className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 font-medium mb-2">Camera Auto-Start</p>
+                <p className="text-gray-600 font-medium mb-2">Kamera Otomatis-Mulai</p>
                 <button 
                   onClick={startCamera}
                   disabled={isLoading}
@@ -628,7 +637,7 @@ const CameraCapture = ({ language, onPrediction }) => {
           <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg">
             <div className="text-center text-white">
               <Loader className="w-8 h-8 animate-spin mx-auto mb-2" />
-              <p>Predicting...</p>
+              <p>Prediksi...</p>
             </div>
           </div>
         )}
@@ -636,7 +645,7 @@ const CameraCapture = ({ language, onPrediction }) => {
         {isAutoCapture && (
           <div className="absolute top-4 left-4 bg-green-500 text-white px-3 py-1 rounded-full text-sm flex items-center gap-1">
             <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-            Auto Mode
+            Mode Otomatis • Huruf Otomatis-Tertambah
           </div>
         )}
 
@@ -644,28 +653,28 @@ const CameraCapture = ({ language, onPrediction }) => {
           <div className="absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center rounded-lg">
             <div className="text-center text-white">
               <div className="text-6xl font-bold mb-2">{countdown}</div>
-              <p className="text-lg">Get ready...</p>
+              <p className="text-lg">Bersiap...</p>
             </div>
           </div>
         )}
 
         {isMirrored && isStreaming && (
           <div className="absolute bottom-4 right-4 bg-blue-500 text-white px-2 py-1 rounded text-xs">
-            Mirror Mode
+            Mode Cermin
           </div>
         )}
       </div>
 
       <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-      {/* Letter Sequence Display */}
+      {/* FIXED: Letter Sequence Display - ALWAYS show when has letters */}
       {letterSequence.length > 0 && (
         <div className="bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-200 rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
             <h4 className="font-bold text-green-900 flex items-center gap-2">
-              🔤 Live Letter Sequence
+              🔤 Urutan Huruf Langsung
               <span className="bg-green-100 text-green-600 text-xs px-2 py-1 rounded-full">
-                {letterSequence.filter(item => !item.isSpace).length} letters
+                {letterSequence.filter(item => !item.isSpace).length} Huruf
               </span>
             </h4>
             <div className="flex items-center gap-2">
@@ -688,7 +697,7 @@ const CameraCapture = ({ language, onPrediction }) => {
             </div>
           </div>
           
-          {/* Letter Display */}
+          {/* Letter Display - Clean A L V I N format */}
           <div className="text-center mb-4">
             <div className="flex justify-center items-center gap-3 flex-wrap mb-3">
               {letterSequence.map((item, index) => (
@@ -729,10 +738,10 @@ const CameraCapture = ({ language, onPrediction }) => {
             
             {/* Statistics */}
             <p className="text-green-700 text-sm mb-3">
-              {letterSequence.filter(item => !item.isSpace).length} letters • {letterSequence.filter(item => item.isSpace).length} spaces
+              {letterSequence.filter(item => !item.isSpace).length} Huruf • {letterSequence.filter(item => item.isSpace).length} Spasi
               • Confidence: {letterSequence.length > 0 ? 
                 (letterSequence.filter(item => !item.isSpace).reduce((acc, item) => acc + item.confidence, 0) / 
-                letterSequence.filter(item => !item.isSpace).length * 100).toFixed(0) : 0}% avg
+                letterSequence.filter(item => !item.isSpace).length * 100).toFixed(0) : 0}% Rata-rata
             </p>
             
             {/* Action Buttons */}
@@ -742,14 +751,14 @@ const CameraCapture = ({ language, onPrediction }) => {
                 className="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-1"
               >
                 <Space className="w-3 h-3" />
-                Add Space
+                Tambah Spasi
               </button>
               <button
                 onClick={copySequenceText}
                 className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-1"
               >
                 <Copy className="w-3 h-3" />
-                Copy Text
+                Salin Text
               </button>
             </div>
           </div>
@@ -799,7 +808,7 @@ const CameraCapture = ({ language, onPrediction }) => {
                 title="Toggle Mirror Mode"
               >
                 <FlipHorizontal2 className="w-4 h-4" />
-                {isMirrored ? 'Mirror ON' : 'Mirror OFF'}
+                {isMirrored ? 'Cermin Nyala' : 'Cermin Mati'}
               </button>
             </div>
           </div>
@@ -819,7 +828,7 @@ const CameraCapture = ({ language, onPrediction }) => {
               ) : (
                 <Square className="w-4 h-4" />
               )}
-              {isCapturing ? 'Predicting...' : 'Capture Now'}
+              {isCapturing ? 'Predicting...' : 'Tangkap sekarang'}
             </button>
 
             <button
@@ -828,7 +837,7 @@ const CameraCapture = ({ language, onPrediction }) => {
               className="btn-secondary flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Timer className="w-4 h-4" />
-              Timer ({timerSeconds}s)
+              Tangkap Pengatur Waktu ({timerSeconds}s)
             </button>
 
             <button
@@ -843,12 +852,12 @@ const CameraCapture = ({ language, onPrediction }) => {
               {isAutoCapture ? (
                 <>
                   <Pause className="w-4 h-4" />
-                  Stop Auto
+                  Hentikan Otomatis
                 </>
               ) : (
                 <>
                   <Play className="w-4 h-4" />
-                  Auto Capture
+                  Tangkap Otomatis
                 </>
               )}
             </button>
@@ -859,9 +868,9 @@ const CameraCapture = ({ language, onPrediction }) => {
                 onChange={(e) => setTimerSeconds(Number(e.target.value))}
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
               >
-                <option value={3}>3 seconds</option>
-                <option value={5}>5 seconds</option>
-                <option value={10}>10 seconds</option>
+                <option value={3}>3 detik</option>
+                <option value={5}>5 detik</option>
+                <option value={10}>10 detik</option>
               </select>
             </div>
           </div>
@@ -884,7 +893,7 @@ const CameraCapture = ({ language, onPrediction }) => {
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <div className="flex items-center gap-2 text-red-700">
-            <span className="text-red-500">Error</span>
+            <span className="text-red-500">⚠️</span>
             <p className="text-sm">{error}</p>
           </div>
         </div>
@@ -892,12 +901,14 @@ const CameraCapture = ({ language, onPrediction }) => {
 
       {/* Instructions */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h4 className="font-medium text-blue-900 mb-2">Petunjuk Penggunaan:</h4>
+        <h4 className="font-medium text-blue-900 mb-2">📋 Petunjuk Penggunaan:</h4>
         <ul className="text-blue-800 text-sm space-y-1">
-          <li>• <strong>Auto Letter Display:</strong> Huruf akan muncul otomatis saat prediksi berhasil (min 20%)</li>
-          <li>• <strong>Auto Capture:</strong> Ambil foto otomatis setiap 3 detik - huruf langsung muncul</li>
-          <li>• <strong>Timer Capture:</strong> Countdown capture - huruf juga langsung muncul</li>
-          <li>• <strong>Manual Capture:</strong> Klik "Capture Now" - huruf akan ditambahkan otomatis</li>
+          <li>• <strong>Tampilan Huruf Otomatis:</strong> Huruf akan muncul otomatis di bawah kamera saat prediksi berhasil (min 20%)</li>
+          <li>• <strong>Tangkap Otomatis:</strong> Ambil foto otomatis setiap 3 detik - huruf langsung muncul</li>
+          <li>• <strong>Tangkap Pengatur Waktu:</strong> Countdown capture - huruf juga langsung muncul</li>
+          <li>• <strong>Tangkap Manual:</strong> Klik "Capture Now" - huruf akan ditambahkan otomatis</li>
+          <li>• <strong>Mode Cermin NYALA:</strong> Untuk tangan kiri (natural movement)</li>
+          <li>• <strong>Mode Cermin MATI:</strong> Untuk tangan kanan atau 2 tangan (BISINDO)</li>
         </ul>
       </div>
     </div>
