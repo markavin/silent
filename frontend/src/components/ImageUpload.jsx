@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Upload, Image, X, Loader, Trash2, Plus, Camera, CameraOff, Type, RefreshCw } from 'lucide-react'
+import { Upload, Image, X, Loader, Trash2, Plus, RefreshCw, Type, Copy, Space } from 'lucide-react'
 import { apiService } from '../services/apiService'
 
 const ImageUpload = ({ language, onPrediction }) => {
@@ -13,37 +13,45 @@ const ImageUpload = ({ language, onPrediction }) => {
   const canvasRef = useRef(document.createElement('canvas'))
   const [backendStatus, setBackendStatus] = useState(null)
   
-  // Letter sequence system (sama seperti CameraCapture)
+  // Letter sequence system
   const [letterSequence, setLetterSequence] = useState([])
   const lastPredictionRef = useRef(0)
   const [sequenceHistory, setSequenceHistory] = useState([])
+
+  // Debug log state untuk membantu debugging
+  const [debugLog, setDebugLog] = useState([])
 
   // Check backend connectivity on component mount
   useEffect(() => {
     checkBackendConnectivity()
   }, [])
 
+  const addDebugLog = (message) => {
+    console.log(message) // Log ke console
+    setDebugLog(prev => [...prev, { time: new Date().toISOString(), message }])
+  }
+
   const checkBackendConnectivity = async () => {
     try {
-      console.log('Checking backend connectivity...')
+      addDebugLog('Checking backend connectivity...')
       const available = await apiService.isBackendAvailable()
       
       if (available) {
-        console.log('Backend is available')
+        addDebugLog('Backend is available')
         setBackendStatus('connected')
         try {
           const status = await apiService.getApiStatus()
-          console.log('Backend status:', status)
+          addDebugLog(`Backend status: ${JSON.stringify(status)}`)
         } catch (err) {
-          console.warn('Could not get full backend status:', err)
+          addDebugLog(`Could not get full backend status: ${err.message}`)
         }
       } else {
-        console.log('Backend is not available')
+        addDebugLog('Backend is not available')
         setBackendStatus('disconnected')
         setError('Backend server tidak tersedia. Pastikan server Python berjalan.')
       }
     } catch (err) {
-      console.error('Backend connectivity check failed:', err)
+      addDebugLog(`Backend connectivity check failed: ${err.message}`)
       setBackendStatus('error')
       setError(`Backend error: ${err.message}`)
     }
@@ -124,6 +132,7 @@ const ImageUpload = ({ language, onPrediction }) => {
 
     Promise.all(imagePromises).then((newImages) => {
       setSelectedImages(prev => [...prev, ...newImages])
+      addDebugLog(`Added ${newImages.length} new images. Total: ${selectedImages.length + newImages.length}`)
     })
   }
 
@@ -143,15 +152,22 @@ const ImageUpload = ({ language, onPrediction }) => {
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
+    addDebugLog('Cleared all images and results')
   }
 
-  // Letter sequence functions (seperti di CameraCapture)
+  // Letter sequence functions
   const addLetterToSequence = (prediction, confidence) => {
     const currentTime = Date.now()
     
+    // Skip "No hand detected" predictions
+    if (!prediction || prediction === "No hand detected" || prediction === "None") {
+      addDebugLog(`Skipping invalid prediction: "${prediction}"`)
+      return false
+    }
+    
     // Universal cooldown
     if (currentTime - lastPredictionRef.current < 2500) {
-      console.log(`Cooldown active, skipping: ${prediction} (${currentTime - lastPredictionRef.current}ms ago)`)
+      addDebugLog(`Cooldown active, skipping: ${prediction} (${currentTime - lastPredictionRef.current}ms ago)`)
       return false
     }
     
@@ -162,12 +178,12 @@ const ImageUpload = ({ language, onPrediction }) => {
     )
     
     if (recentSame) {
-      console.log(`Duplicate blocked: ${prediction} already exists in last 5 seconds`)
+      addDebugLog(`Duplicate blocked: ${prediction} already exists in last 5 seconds`)
       return false
     }
     
-    // Low confidence threshold
-    if (confidence >= 0.2) {
+    // Low confidence threshold - REDUCED FOR TESTING
+    if (confidence >= 0.1) {
       const newLetter = {
         id: currentTime,
         letter: prediction,
@@ -179,14 +195,14 @@ const ImageUpload = ({ language, onPrediction }) => {
       setSequenceHistory(prev => [...prev.slice(-9), [...letterSequence]])
       setLetterSequence(prev => {
         const newSequence = [...prev, newLetter]
-        console.log(`Letter added: ${prediction} (${(confidence * 100).toFixed(1)}%) from upload mode - Total: ${newSequence.length}`)
+        addDebugLog(`Letter added: ${prediction} (${(confidence * 100).toFixed(1)}%) from upload mode - Total: ${newSequence.length}`)
         return newSequence
       })
       
       lastPredictionRef.current = currentTime
       return true
     } else {
-      console.log(`Confidence too low: ${prediction} (${(confidence * 100).toFixed(1)}%)`)
+      addDebugLog(`Confidence too low: ${prediction} (${(confidence * 100).toFixed(1)}%)`)
       return false
     }
   }
@@ -194,7 +210,7 @@ const ImageUpload = ({ language, onPrediction }) => {
   const clearSequence = () => {
     setSequenceHistory(prev => [...prev.slice(-9), [...letterSequence]])
     setLetterSequence([])
-    console.log('Letter sequence cleared')
+    addDebugLog('Letter sequence cleared')
   }
 
   const undoLastLetter = () => {
@@ -202,7 +218,7 @@ const ImageUpload = ({ language, onPrediction }) => {
       const previousSequence = sequenceHistory[sequenceHistory.length - 1]
       setLetterSequence(previousSequence)
       setSequenceHistory(prev => prev.slice(0, -1))
-      console.log('Undid last letter')
+      addDebugLog('Undid last letter')
     }
   }
 
@@ -219,7 +235,7 @@ const ImageUpload = ({ language, onPrediction }) => {
     setSequenceHistory(prev => [...prev.slice(-9), [...letterSequence]])
     setLetterSequence(prev => [...prev, spaceItem])
     
-    console.log('Space added to sequence')
+    addDebugLog('Space added to sequence')
   }
 
   const copySequenceText = () => {
@@ -228,7 +244,7 @@ const ImageUpload = ({ language, onPrediction }) => {
     alert('Text copied to clipboard!')
   }
 
-  // Image processing function identik dengan CameraCapture
+  // IMPROVED: Image processing function dengan debugging dan opsi yang lebih lengkap
   const preprocessImageForPrediction = (file) => {
     return new Promise((resolve, reject) => {
       const canvas = canvasRef.current
@@ -237,9 +253,14 @@ const ImageUpload = ({ language, onPrediction }) => {
 
       img.onload = () => {
         try {
+          addDebugLog(`Processing image: ${file.name}, size: ${file.size} bytes`)
+          addDebugLog(`Original dimensions: ${img.width}x${img.height}`)
+          
           // Set canvas size - IDENTIK dengan camera preprocessing
           canvas.width = img.width || 1280
           canvas.height = img.height || 720
+
+          addDebugLog(`Canvas set to: ${canvas.width}x${canvas.height}`)
 
           // Clear canvas
           ctx.clearRect(0, 0, canvas.width, canvas.height)
@@ -248,6 +269,7 @@ const ImageUpload = ({ language, onPrediction }) => {
 
           // Draw image (no mirroring for uploaded images)
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+          addDebugLog('Image drawn to canvas')
 
           // CRITICAL: Apply IDENTICAL contrast enhancement as camera_test.py
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
@@ -260,18 +282,26 @@ const ImageUpload = ({ language, onPrediction }) => {
           }
           
           ctx.putImageData(imageData, 0, 0)
+          addDebugLog('Contrast enhancement applied')
 
           // Convert to blob with same quality as camera
           canvas.toBlob((blob) => {
-            resolve(blob)
+            if (blob) {
+              addDebugLog(`Blob created: ${blob.size} bytes`)
+              resolve(blob)
+            } else {
+              reject(new Error('Failed to create blob from canvas'))
+            }
           }, 'image/jpeg', 0.92)
 
         } catch (error) {
+          addDebugLog(`Image processing error: ${error.message}`)
           reject(new Error(`Image processing failed: ${error.message}`))
         }
       }
 
       img.onerror = () => {
+        addDebugLog('Failed to load image for processing')
         reject(new Error('Failed to load image for processing'))
       }
 
@@ -280,7 +310,10 @@ const ImageUpload = ({ language, onPrediction }) => {
       reader.onload = (e) => {
         img.src = e.target.result
       }
-      reader.onerror = () => reject(new Error('Failed to read image file'))
+      reader.onerror = () => {
+        addDebugLog('Failed to read image file')
+        reject(new Error('Failed to read image file'))
+      }
       reader.readAsDataURL(file)
     })
   }
@@ -302,6 +335,9 @@ const ImageUpload = ({ language, onPrediction }) => {
     const newResults = []
     const predictionLetters = []
 
+    addDebugLog(`Starting prediction for ${selectedImages.length} images`)
+    addDebugLog(`Using language: ${language}`)
+
     for (let i = 0; i < selectedImages.length; i++) {
       const image = selectedImages[i]
       setProcessingIndex(i)
@@ -316,13 +352,52 @@ const ImageUpload = ({ language, onPrediction }) => {
       )
 
       try {
-        console.log(`Processing image ${i + 1}/${selectedImages.length}: ${image.name}`)
+        addDebugLog(`Processing image ${i + 1}/${selectedImages.length}: ${image.name}`)
 
-        // IDENTIK preprocessing seperti camera
-        const processedBlob = await preprocessImageForPrediction(image.file)
+        // IMPROVED: Preprocessing with better error handling
+        let processedBlob = null
+        try {
+          processedBlob = await preprocessImageForPrediction(image.file)
+          addDebugLog(`Preprocessing successful: ${processedBlob.size} bytes`)
+        } catch (preprocessError) {
+          addDebugLog(`Preprocessing failed: ${preprocessError.message}`)
+          throw new Error(`Preprocessing failed: ${preprocessError.message}`)
+        }
         
-        // Make prediction with processed blob
-        const result = await apiService.predictImage(processedBlob, language, false) // no mirror for uploads
+        if (!processedBlob) {
+          throw new Error('Preprocessing produced null blob')
+        }
+        
+        // Create FormData untuk debugging
+        const formData = new FormData()
+        formData.append('image', processedBlob)
+        formData.append('language', language)
+        formData.append('mirror', 'false')
+        
+        addDebugLog(`Sending to API: ${language}, blob size: ${processedBlob.size}`)
+        
+        // Make prediction with processed blob - WITH RETRY
+        let result = null
+        let retryCount = 0
+        const maxRetries = 2
+        
+        while (retryCount <= maxRetries) {
+          try {
+            result = await apiService.predictImage(processedBlob, language, false)
+            addDebugLog(`API response: ${JSON.stringify(result)}`)
+            break
+          } catch (apiError) {
+            retryCount++
+            addDebugLog(`API call failed (attempt ${retryCount}): ${apiError.message}`)
+            if (retryCount > maxRetries) throw apiError
+            await new Promise(r => setTimeout(r, 1000)) // Wait 1s before retry
+          }
+        }
+
+        // Safety check for result
+        if (!result) {
+          throw new Error('API returned null result')
+        }
         
         const resultData = {
           imageId: image.id,
@@ -334,16 +409,18 @@ const ImageUpload = ({ language, onPrediction }) => {
 
         newResults.push(resultData)
 
-        // Add to letter sequence if successful (seperti di CameraCapture)
+        // Add to letter sequence if successful
         if (result.success && result.prediction && result.prediction !== "No hand detected") {
-          console.log(`Attempting to add "${result.prediction}" (confidence: ${result.confidence})`)
+          addDebugLog(`Attempting to add "${result.prediction}" (confidence: ${result.confidence})`)
           const wasAdded = addLetterToSequence(result.prediction, result.confidence)
-          console.log(`Add result: ${wasAdded ? 'SUCCESS' : 'BLOCKED'}`)
+          addDebugLog(`Add result: ${wasAdded ? 'SUCCESS' : 'BLOCKED'}`)
           
           // Collect successful predictions for string
           if (wasAdded) {
             predictionLetters.push(result.prediction)
           }
+        } else {
+          addDebugLog(`Skip adding to sequence: success=${result.success}, prediction="${result.prediction}"`)
         }
 
         // Update image status
@@ -358,7 +435,7 @@ const ImageUpload = ({ language, onPrediction }) => {
         // Send individual result to parent (for history)
         onPrediction(result, image.preview)
 
-        console.log(`Image ${i + 1} result:`, result.prediction, `(${(result.confidence * 100).toFixed(1)}%)`)
+        addDebugLog(`Image ${i + 1} result: ${result.prediction} (${(result.confidence * 100).toFixed(1)}%)`)
 
         // Small delay between requests
         if (i < selectedImages.length - 1) {
@@ -366,7 +443,7 @@ const ImageUpload = ({ language, onPrediction }) => {
         }
 
       } catch (err) {
-        console.error(`Error processing ${image.name}:`, err)
+        addDebugLog(`Error processing ${image.name}: ${err.message}`)
         
         const errorResult = {
           imageId: image.id,
@@ -393,13 +470,17 @@ const ImageUpload = ({ language, onPrediction }) => {
     
     // Build prediction string dari sequence
     if (letterSequence.length > 0) {
-      setPredictionString(letterSequence.map(item => item.letter).join(''))
+      const finalString = letterSequence.map(item => item.letter).join('')
+      setPredictionString(finalString)
+      addDebugLog(`Final prediction string: "${finalString}"`)
+    } else {
+      addDebugLog('No letters in sequence after processing')
     }
     
     setIsLoading(false)
     setProcessingIndex(-1)
 
-    console.log('Batch processing complete.')
+    addDebugLog('Batch processing complete')
   }
 
   // Get status color
@@ -642,12 +723,12 @@ const ImageUpload = ({ language, onPrediction }) => {
         )}
       </div>
 
-      {/* Letter Sequence Display (Seperti di CameraCapture) */}
+      {/* Letter Sequence Display */}
       {letterSequence.length > 0 && (
         <div className="bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-200 rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
             <h4 className="font-bold text-green-900 flex items-center gap-2">
-              🔤 Live Letter Sequence
+              Live Letter Sequence
               <span className="bg-green-100 text-green-600 text-xs px-2 py-1 rounded-full">
                 {letterSequence.filter(item => !item.isSpace).length} letters
               </span>
@@ -716,14 +797,14 @@ const ImageUpload = ({ language, onPrediction }) => {
                 onClick={addSpaceToSequence}
                 className="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-1"
               >
-                <span className="w-3 h-3">-</span>
+                <Space className="w-4 h-4" />
                 Add Space
               </button>
               <button
                 onClick={copySequenceText}
                 className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-1"
               >
-                <span className="w-3 h-3">+</span>
+                <Copy className="w-4 h-4" />
                 Copy Text
               </button>
             </div>
@@ -795,9 +876,9 @@ const ImageUpload = ({ language, onPrediction }) => {
       {/* Instructions */}
       {backendStatus === 'connected' && selectedImages.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h4 className="font-medium text-blue-900 mb-2">📋 Petunjuk Penggunaan:</h4>
+          <h4 className="font-medium text-blue-900 mb-2">Petunjuk Penggunaan:</h4>
           <ul className="text-blue-800 text-sm space-y-1">
-            <li>• <strong>Auto Letter Display:</strong> Huruf akan muncul otomatis saat prediksi berhasil (min 20%)</li>
+            <li>• <strong>Auto Letter Display:</strong> Huruf akan muncul otomatis saat prediksi berhasil (min 10% confidence)</li>
             <li>• <strong>Multiple Upload:</strong> Tambahkan hingga 10 gambar untuk diproses sekaligus</li>
             <li>• <strong>Sequence Building:</strong> Huruf secara otomatis ditambahkan ke sequence</li>
             <li>• <strong>Optimal Results:</strong> Pastikan gambar dengan latar belakang yang kontras</li>
@@ -805,6 +886,27 @@ const ImageUpload = ({ language, onPrediction }) => {
         </div>
       )}
       
+      {/* Debug Log (hanya tampil saat ada error) */}
+      {error && debugLog.length > 0 && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mt-4">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="font-medium text-gray-700">Debug Log</h4>
+            <button 
+              onClick={() => setDebugLog([])}
+              className="text-gray-500 hover:text-gray-700 text-xs"
+            >
+              Clear Log
+            </button>
+          </div>
+          <div className="bg-gray-800 text-green-400 p-3 rounded text-xs font-mono h-32 overflow-y-auto">
+            {debugLog.map((log, i) => (
+              <div key={i} className="mb-1">
+                <span className="text-gray-500">[{log.time.split('T')[1].split('.')[0]}]</span> {log.message}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
