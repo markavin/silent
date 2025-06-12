@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { Upload, Image, X, Loader, Trash2, Plus } from 'lucide-react'
 import { apiService } from '../services/apiService'
 
@@ -9,7 +9,39 @@ const ImageUpload = ({ language, onPrediction }) => {
   const [processingIndex, setProcessingIndex] = useState(-1)
   const [results, setResults] = useState([])
   const [predictionString, setPredictionString] = useState('')
+  const [backendStatus, setBackendStatus] = useState(null)
   const fileInputRef = useRef(null)
+
+  // Check backend connectivity on component mount
+  useEffect(() => {
+    checkBackendConnectivity()
+  }, [])
+
+  const checkBackendConnectivity = async () => {
+    try {
+      console.log('Checking backend connectivity for image upload...')
+      const available = await apiService.isBackendAvailable()
+      
+      if (available) {
+        console.log('Backend is available for image upload')
+        setBackendStatus('connected')
+        try {
+          const status = await apiService.getApiStatus()
+          console.log('Backend status for image upload:', status)
+        } catch (err) {
+          console.warn('Could not get full backend status:', err)
+        }
+      } else {
+        console.log('Backend is not available for image upload')
+        setBackendStatus('disconnected')
+        setError('Backend server tidak tersedia. Pastikan server Python berjalan.')
+      }
+    } catch (err) {
+      console.error('Backend connectivity check failed for image upload:', err)
+      setBackendStatus('error')
+      setError(`Backend error: ${err.message}`)
+    }
+  }
 
   // Handle file selection (multiple/additive)
   const handleFileSelect = (event) => {
@@ -106,7 +138,7 @@ const ImageUpload = ({ language, onPrediction }) => {
     }
   }
 
-  // FIXED: Use same preprocessing as camera
+  // FIXED: Use exact same preprocessing as CameraCapture
   const preprocessImageForPrediction = (file) => {
     return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas')
@@ -115,39 +147,37 @@ const ImageUpload = ({ language, onPrediction }) => {
 
       img.onload = () => {
         try {
-          // Set canvas size - IDENTICAL to camera preprocessing
-          const maxSize = 1280
-          let { width, height } = img
-          
-          if (width > height) {
-            if (width > maxSize) {
-              height = (height * maxSize) / width
-              width = maxSize
-            }
-          } else {
-            if (height > maxSize) {
-              width = (width * maxSize) / height
-              height = maxSize
-            }
-          }
+          // Use exact same dimensions as CameraCapture
+          canvas.width = 1280
+          canvas.height = 720
 
-          canvas.width = width
-          canvas.height = height
-
-          // Clear canvas
-          ctx.clearRect(0, 0, width, height)
+          // Clear canvas and set same rendering properties
+          ctx.clearRect(0, 0, canvas.width, canvas.height)
           ctx.imageSmoothingEnabled = true
           ctx.imageSmoothingQuality = 'high'
 
-          // Draw image (no mirroring for uploaded images)
-          ctx.drawImage(img, 0, 0, width, height)
+          // Calculate scaling to fit image in 1280x720 maintaining aspect ratio
+          const targetWidth = canvas.width
+          const targetHeight = canvas.height
+          const sourceWidth = img.width
+          const sourceHeight = img.height
 
-          // CRITICAL: Apply same contrast enhancement as camera
-          const imageData = ctx.getImageData(0, 0, width, height)
+          const scale = Math.min(targetWidth / sourceWidth, targetHeight / sourceHeight)
+          const scaledWidth = sourceWidth * scale
+          const scaledHeight = sourceHeight * scale
+
+          // Center the image
+          const offsetX = (targetWidth - scaledWidth) / 2
+          const offsetY = (targetHeight - scaledHeight) / 2
+
+          // Draw image centered (no mirroring for uploaded images)
+          ctx.drawImage(img, offsetX, offsetY, scaledWidth, scaledHeight)
+
+          // Apply EXACT same contrast enhancement as CameraCapture
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
           const data = imageData.data
           
           for (let i = 0; i < data.length; i += 4) {
-            // IDENTICAL contrast enhancement to camera_test.py
             data[i] = Math.min(255, Math.max(0, (data[i] - 128) * 1.1 + 128))
             data[i + 1] = Math.min(255, Math.max(0, (data[i + 1] - 128) * 1.1 + 128))
             data[i + 2] = Math.min(255, Math.max(0, (data[i + 2] - 128) * 1.1 + 128))
@@ -155,7 +185,7 @@ const ImageUpload = ({ language, onPrediction }) => {
           
           ctx.putImageData(imageData, 0, 0)
 
-          // Convert to blob with same quality as camera
+          // Convert to blob with exact same quality as CameraCapture
           canvas.toBlob((blob) => {
             resolve(blob)
           }, 'image/jpeg', 0.92)
@@ -183,6 +213,11 @@ const ImageUpload = ({ language, onPrediction }) => {
   const predictAllImages = async () => {
     if (selectedImages.length === 0) return
 
+    if (backendStatus !== 'connected') {
+      setError('Backend tidak tersedia. Cek koneksi ke server Python.')
+      return
+    }
+
     setIsLoading(true)
     setError(null)
     setResults([])
@@ -207,11 +242,11 @@ const ImageUpload = ({ language, onPrediction }) => {
       try {
         console.log(`Processing image ${i + 1}/${selectedImages.length}: ${image.name}`)
 
-        // FIXED: Use same preprocessing as camera
+        // Use exact same preprocessing as CameraCapture
         const processedBlob = await preprocessImageForPrediction(image.file)
         
-        // Make prediction with processed blob
-        const result = await apiService.predictImage(processedBlob, language, false) // no mirror for uploads
+        // Make prediction with processed blob (no mirror for uploads)
+        const result = await apiService.predictImage(processedBlob, language, false)
         
         const resultData = {
           imageId: image.id,
@@ -250,11 +285,20 @@ const ImageUpload = ({ language, onPrediction }) => {
       } catch (err) {
         console.error(`Error processing ${image.name}:`, err)
         
+        let errorMessage = err.message || 'Failed to predict image'
+        
+        if (err.message.includes('Network error')) {
+          errorMessage = 'Tidak bisa menghubungi server. Pastikan backend Python berjalan.'
+          setBackendStatus('disconnected')
+        } else if (err.message.includes('timeout')) {
+          errorMessage = 'Server terlalu lama merespons. Coba lagi.'
+        }
+        
         const errorResult = {
           imageId: image.id,
           imageName: image.name,
           imagePreview: image.preview,
-          result: { success: false, error: err.message },
+          result: { success: false, error: errorMessage },
           timestamp: new Date()
         }
 
@@ -264,7 +308,7 @@ const ImageUpload = ({ language, onPrediction }) => {
         setSelectedImages(prev => 
           prev.map(img => 
             img.id === image.id 
-              ? { ...img, status: 'error', error: err.message }
+              ? { ...img, status: 'error', error: errorMessage }
               : img
           )
         )
@@ -296,6 +340,35 @@ const ImageUpload = ({ language, onPrediction }) => {
 
   return (
     <div className="space-y-4">
+      {/* Backend Status Indicator */}
+      {backendStatus && (
+        <div className="flex items-center justify-between p-3 rounded-lg border">
+          <div className="flex items-center gap-2">
+            <div className={`w-3 h-3 rounded-full ${
+              backendStatus === 'connected' ? 'bg-green-500' : 
+              backendStatus === 'disconnected' ? 'bg-red-500' : 
+              'bg-yellow-500'
+            }`}></div>
+            <span className="text-sm font-medium">
+              {
+                backendStatus === 'connected' ? 'Connected' :
+                backendStatus === 'disconnected' ? 'Disconnected' :
+                'Checking...'
+              }
+            </span>
+          </div>
+          
+          {backendStatus !== 'connected' && (
+            <button
+              onClick={checkBackendConnectivity}
+              className="text-blue-500 hover:text-blue-700 text-sm"
+            >
+              Retry Connection
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">Multiple Image Upload</h3>
@@ -318,6 +391,7 @@ const ImageUpload = ({ language, onPrediction }) => {
               onClick={() => fileInputRef.current?.click()}
               className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm flex items-center gap-1"
               title="Add more images"
+              disabled={backendStatus !== 'connected'}
             >
               <Plus className="w-3 h-3" />
               Add
@@ -328,30 +402,43 @@ const ImageUpload = ({ language, onPrediction }) => {
         {/* Error Message */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-            <p className="text-red-700 text-sm">{error}</p>
+            <div className="flex items-center gap-2 text-red-700">
+              <span className="text-red-500">Warning:</span>
+              <p className="text-sm">{error}</p>
+            </div>
           </div>
         )}
 
         {/* Upload Zone or Image Grid */}
         {selectedImages.length === 0 ? (
           <div
-            className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors cursor-pointer"
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            onClick={() => fileInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+              backendStatus === 'connected' 
+                ? 'border-gray-300 hover:border-blue-400 cursor-pointer' 
+                : 'border-gray-200 cursor-not-allowed bg-gray-50'
+            }`}
+            onDrop={backendStatus === 'connected' ? handleDrop : undefined}
+            onDragOver={backendStatus === 'connected' ? handleDragOver : undefined}
+            onClick={backendStatus === 'connected' ? () => fileInputRef.current?.click() : undefined}
           >
-            <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h4 className="text-lg font-medium text-gray-700 mb-2">
-              Drop your images here
+            <Upload className={`w-12 h-12 mx-auto mb-4 ${
+              backendStatus === 'connected' ? 'text-gray-400' : 'text-gray-300'
+            }`} />
+            <h4 className={`text-lg font-medium mb-2 ${
+              backendStatus === 'connected' ? 'text-gray-700' : 'text-gray-400'
+            }`}>
+              {backendStatus === 'connected' ? 'Drop your images here' : 'Backend not connected'}
             </h4>
-            <p className="text-gray-500 mb-4">
-              atau klik untuk memilih files
+            <p className={`mb-4 ${
+              backendStatus === 'connected' ? 'text-gray-500' : 'text-gray-400'
+            }`}>
+              {backendStatus === 'connected' ? 'atau klik untuk memilih files' : 'Connect to backend first'}
             </p>
             <p className="text-sm text-gray-400">
               Format: JPG, PNG, BMP • Max: 10MB per file • Up to 10 images total
             </p>
             <p className="text-xs text-blue-600 mt-2">
-              ✨ Sekarang menggunakan preprocessing yang sama dengan camera mode
+              Enhanced preprocessing matching camera mode for better accuracy
             </p>
             
             <input
@@ -361,6 +448,7 @@ const ImageUpload = ({ language, onPrediction }) => {
               multiple
               onChange={handleFileSelect}
               className="hidden"
+              disabled={backendStatus !== 'connected'}
             />
           </div>
         ) : (
@@ -376,7 +464,7 @@ const ImageUpload = ({ language, onPrediction }) => {
                   </span>
                 </div>
                 <p className="text-blue-700 text-sm mt-1">
-                  Menggunakan preprocessing yang sama dengan camera mode
+                  Using enhanced preprocessing for better accuracy
                 </p>
               </div>
             )}
@@ -396,9 +484,9 @@ const ImageUpload = ({ language, onPrediction }) => {
                   {/* Status Badge */}
                   <div className={`absolute top-2 left-2 px-2 py-1 rounded text-xs font-medium ${getStatusColor(image.status)}`}>
                     {image.status === 'processing' && <Loader className="w-3 h-3 animate-spin inline mr-1" />}
-                    {image.status === 'ready' && '●'}
-                    {image.status === 'completed' && '✓'}
-                    {image.status === 'error' && '✗'}
+                    {image.status === 'ready' && 'Ready'}
+                    {image.status === 'completed' && 'Done'}
+                    {image.status === 'error' && 'Error'}
                     {' '}{index + 1}
                   </div>
 
@@ -444,7 +532,7 @@ const ImageUpload = ({ language, onPrediction }) => {
               ))}
 
               {/* Add More Zone (if less than 10) */}
-              {selectedImages.length < 10 && (
+              {selectedImages.length < 10 && backendStatus === 'connected' && (
                 <div
                   className="aspect-square border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors"
                   onClick={() => fileInputRef.current?.click()}
@@ -461,8 +549,8 @@ const ImageUpload = ({ language, onPrediction }) => {
             <div className="flex justify-center gap-4">
               <button
                 onClick={predictAllImages}
-                disabled={isLoading || selectedImages.length === 0}
-                className="btn-primary flex items-center gap-2"
+                disabled={isLoading || selectedImages.length === 0 || backendStatus !== 'connected'}
+                className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
                   <>
@@ -485,6 +573,7 @@ const ImageUpload = ({ language, onPrediction }) => {
               multiple
               onChange={handleFileSelect}
               className="hidden"
+              disabled={backendStatus !== 'connected'}
             />
           </div>
         )}
@@ -493,7 +582,7 @@ const ImageUpload = ({ language, onPrediction }) => {
       {/* Prediction String Display */}
       {predictionString && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-          <h4 className="font-medium text-green-900 mb-4 text-center">🔤 Hasil Terjemahan:</h4>
+          <h4 className="font-medium text-green-900 mb-4 text-center">Hasil Terjemahan:</h4>
           <div className="text-center">
             <div className="text-4xl font-bold text-green-600 mb-2 tracking-widest">
               {predictionString}
@@ -508,7 +597,7 @@ const ImageUpload = ({ language, onPrediction }) => {
               }}
               className="mt-3 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm"
             >
-              📋 Copy Hasil
+              Copy Hasil
             </button>
           </div>
         </div>
@@ -548,7 +637,18 @@ const ImageUpload = ({ language, onPrediction }) => {
           </div>
         </div>
       )}
-      
+
+      {/* Instructions */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <h4 className="font-medium text-blue-900 mb-2">Petunjuk Penggunaan:</h4>
+        <ul className="text-blue-800 text-sm space-y-1">
+          <li>• Upload multiple images (maksimal 10 files)</li>
+          <li>• Menggunakan preprocessing yang sama dengan camera mode untuk akurasi maksimal</li>
+          <li>• Format yang didukung: JPG, PNG, BMP (maksimal 10MB per file)</li>
+          <li>• Batch processing akan memproses semua gambar secara berurutan</li>
+          <li>• Hasil akan ditampilkan sebagai string huruf yang terbaca</li>
+        </ul>
+      </div>
     </div>
   )
 }
