@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react'
-import { Upload, Image, X, Loader, Trash2, Plus, RefreshCw, Type, Copy, Space } from 'lucide-react'
+import React, { useState, useRef } from 'react'
+import { Upload, Image, X, Loader, Trash2, Plus } from 'lucide-react'
 import { apiService } from '../services/apiService'
 
 const ImageUpload = ({ language, onPrediction }) => {
@@ -8,54 +8,8 @@ const ImageUpload = ({ language, onPrediction }) => {
   const [error, setError] = useState(null)
   const [processingIndex, setProcessingIndex] = useState(-1)
   const [results, setResults] = useState([])
-  const [predictionString, setPredictionString] = useState('')
+  const [predictionString, setPredictionString] = useState('') // New: String hasil prediksi
   const fileInputRef = useRef(null)
-  const canvasRef = useRef(document.createElement('canvas'))
-  const [backendStatus, setBackendStatus] = useState(null)
-  
-  // Letter sequence system
-  const [letterSequence, setLetterSequence] = useState([])
-  const lastPredictionRef = useRef(0)
-  const [sequenceHistory, setSequenceHistory] = useState([])
-
-  // Debug log state untuk membantu debugging
-  const [debugLog, setDebugLog] = useState([])
-
-  // Check backend connectivity on component mount
-  useEffect(() => {
-    checkBackendConnectivity()
-  }, [])
-
-  const addDebugLog = (message) => {
-    console.log(message) // Log ke console
-    setDebugLog(prev => [...prev, { time: new Date().toISOString(), message }])
-  }
-
-  const checkBackendConnectivity = async () => {
-    try {
-      addDebugLog('Checking backend connectivity...')
-      const available = await apiService.isBackendAvailable()
-      
-      if (available) {
-        addDebugLog('Backend is available')
-        setBackendStatus('connected')
-        try {
-          const status = await apiService.getApiStatus()
-          addDebugLog(`Backend status: ${JSON.stringify(status)}`)
-        } catch (err) {
-          addDebugLog(`Could not get full backend status: ${err.message}`)
-        }
-      } else {
-        addDebugLog('Backend is not available')
-        setBackendStatus('disconnected')
-        setError('Backend server tidak tersedia. Pastikan server Python berjalan.')
-      }
-    } catch (err) {
-      addDebugLog(`Backend connectivity check failed: ${err.message}`)
-      setBackendStatus('error')
-      setError(`Backend error: ${err.message}`)
-    }
-  }
 
   // Handle file selection (multiple/additive)
   const handleFileSelect = (event) => {
@@ -121,7 +75,7 @@ const ImageUpload = ({ language, onPrediction }) => {
             preview: e.target.result,
             name: file.name,
             size: file.size,
-            status: 'ready',
+            status: 'ready', // ready, processing, completed, error
             result: null,
             error: null
           })
@@ -131,8 +85,8 @@ const ImageUpload = ({ language, onPrediction }) => {
     })
 
     Promise.all(imagePromises).then((newImages) => {
+      // ADD to existing images (additive behavior)
       setSelectedImages(prev => [...prev, ...newImages])
-      addDebugLog(`Added ${newImages.length} new images. Total: ${selectedImages.length + newImages.length}`)
     })
   }
 
@@ -146,197 +100,24 @@ const ImageUpload = ({ language, onPrediction }) => {
   const clearAllImages = () => {
     setSelectedImages([])
     setResults([])
-    setPredictionString('')
-    setLetterSequence([])
+    setPredictionString('') // Clear string hasil
     setError(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
-    addDebugLog('Cleared all images and results')
-  }
-
-  // Letter sequence functions
-  const addLetterToSequence = (prediction, confidence) => {
-    const currentTime = Date.now()
-    
-    // Skip "No hand detected" predictions
-    if (!prediction || prediction === "No hand detected" || prediction === "None") {
-      addDebugLog(`Skipping invalid prediction: "${prediction}"`)
-      return false
-    }
-    
-    // Universal cooldown
-    if (currentTime - lastPredictionRef.current < 2500) {
-      addDebugLog(`Cooldown active, skipping: ${prediction} (${currentTime - lastPredictionRef.current}ms ago)`)
-      return false
-    }
-    
-    // Check for exact same letter in last 5 seconds
-    const recentSame = letterSequence.find(item => 
-      item.letter === prediction && 
-      (currentTime - new Date(item.timestamp).getTime()) < 5000
-    )
-    
-    if (recentSame) {
-      addDebugLog(`Duplicate blocked: ${prediction} already exists in last 5 seconds`)
-      return false
-    }
-    
-    // Low confidence threshold - REDUCED FOR TESTING
-    if (confidence >= 0.1) {
-      const newLetter = {
-        id: currentTime,
-        letter: prediction,
-        confidence: confidence,
-        timestamp: new Date(),
-        source: 'upload'
-      }
-      
-      setSequenceHistory(prev => [...prev.slice(-9), [...letterSequence]])
-      setLetterSequence(prev => {
-        const newSequence = [...prev, newLetter]
-        addDebugLog(`Letter added: ${prediction} (${(confidence * 100).toFixed(1)}%) from upload mode - Total: ${newSequence.length}`)
-        return newSequence
-      })
-      
-      lastPredictionRef.current = currentTime
-      return true
-    } else {
-      addDebugLog(`Confidence too low: ${prediction} (${(confidence * 100).toFixed(1)}%)`)
-      return false
-    }
-  }
-
-  const clearSequence = () => {
-    setSequenceHistory(prev => [...prev.slice(-9), [...letterSequence]])
-    setLetterSequence([])
-    addDebugLog('Letter sequence cleared')
-  }
-
-  const undoLastLetter = () => {
-    if (sequenceHistory.length > 0) {
-      const previousSequence = sequenceHistory[sequenceHistory.length - 1]
-      setLetterSequence(previousSequence)
-      setSequenceHistory(prev => prev.slice(0, -1))
-      addDebugLog('Undid last letter')
-    }
-  }
-
-  const addSpaceToSequence = () => {
-    const spaceItem = {
-      id: Date.now(),
-      letter: ' ',
-      confidence: 1.0,
-      timestamp: new Date(),
-      isSpace: true,
-      source: 'manual'
-    }
-    
-    setSequenceHistory(prev => [...prev.slice(-9), [...letterSequence]])
-    setLetterSequence(prev => [...prev, spaceItem])
-    
-    addDebugLog('Space added to sequence')
-  }
-
-  const copySequenceText = () => {
-    const text = letterSequence.map(item => item.letter).join('')
-    navigator.clipboard.writeText(text)
-    alert('Text copied to clipboard!')
-  }
-
-  // IMPROVED: Image processing function dengan debugging dan opsi yang lebih lengkap
-  const preprocessImageForPrediction = (file) => {
-    return new Promise((resolve, reject) => {
-      const canvas = canvasRef.current
-      const ctx = canvas.getContext('2d')
-      const img = new Image()
-
-      img.onload = () => {
-        try {
-          addDebugLog(`Processing image: ${file.name}, size: ${file.size} bytes`)
-          addDebugLog(`Original dimensions: ${img.width}x${img.height}`)
-          
-          // Set canvas size - IDENTIK dengan camera preprocessing
-          canvas.width = 640
-          canvas.height = 480
-
-          addDebugLog(`Canvas set to: ${canvas.width}x${canvas.height}`)
-
-          // Clear canvas
-          ctx.clearRect(0, 0, canvas.width, canvas.height)
-          ctx.imageSmoothingEnabled = true
-          ctx.imageSmoothingQuality = 'high'
-
-          // Draw image (no mirroring for uploaded images)
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-          addDebugLog('Image drawn to canvas')
-
-          // CRITICAL: Apply IDENTICAL contrast enhancement as camera_test.py
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-          const data = imageData.data
-          
-          for (let i = 0; i < data.length; i += 4) {
-            data[i] = Math.min(255, Math.max(0, (data[i] - 128) * 1.1 + 128))
-            data[i + 1] = Math.min(255, Math.max(0, (data[i + 1] - 128) * 1.1 + 128))
-            data[i + 2] = Math.min(255, Math.max(0, (data[i + 2] - 128) * 1.1 + 128))
-          }
-          
-          ctx.putImageData(imageData, 0, 0)
-          addDebugLog('Contrast enhancement applied')
-
-          // Convert to blob with same quality as camera
-          canvas.toBlob((blob) => {
-            if (blob) {
-              addDebugLog(`Blob created: ${blob.size} bytes`)
-              resolve(blob)
-            } else {
-              reject(new Error('Failed to create blob from canvas'))
-            }
-          }, 'image/jpeg', 0.92)
-
-        } catch (error) {
-          addDebugLog(`Image processing error: ${error.message}`)
-          reject(new Error(`Image processing failed: ${error.message}`))
-        }
-      }
-
-      img.onerror = () => {
-        addDebugLog('Failed to load image for processing')
-        reject(new Error('Failed to load image for processing'))
-      }
-
-      // Load image from file
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        img.src = e.target.result
-      }
-      reader.onerror = () => {
-        addDebugLog('Failed to read image file')
-        reject(new Error('Failed to read image file'))
-      }
-      reader.readAsDataURL(file)
-    })
   }
 
   // Predict all images (batch processing)
   const predictAllImages = async () => {
     if (selectedImages.length === 0) return
-    
-    if (backendStatus !== 'connected') {
-      setError('Backend tidak tersedia. Cek koneksi ke server Python.')
-      return
-    }
 
     setIsLoading(true)
     setError(null)
     setResults([])
-    setPredictionString('')
+    setPredictionString('') // Reset string
 
     const newResults = []
-    const predictionLetters = []
-
-    addDebugLog(`Starting prediction for ${selectedImages.length} images`)
-    addDebugLog(`Using language: ${language}`)
+    const predictionLetters = [] // New: Collect letters for string
 
     for (let i = 0; i < selectedImages.length; i++) {
       const image = selectedImages[i]
@@ -352,52 +133,13 @@ const ImageUpload = ({ language, onPrediction }) => {
       )
 
       try {
-        addDebugLog(`Processing image ${i + 1}/${selectedImages.length}: ${image.name}`)
-
-        // IMPROVED: Preprocessing with better error handling
-        let processedBlob = null
-        try {
-          processedBlob = await preprocessImageForPrediction(image.file)
-          addDebugLog(`Preprocessing successful: ${processedBlob.size} bytes`)
-        } catch (preprocessError) {
-          addDebugLog(`Preprocessing failed: ${preprocessError.message}`)
-          throw new Error(`Preprocessing failed: ${preprocessError.message}`)
-        }
-        
-        if (!processedBlob) {
-          throw new Error('Preprocessing produced null blob')
-        }
-        
-        // Create FormData untuk debugging
+        // Create form data
         const formData = new FormData()
-        formData.append('image', processedBlob)
-        formData.append('language', language)
-        formData.append('mirror', 'false')
-        
-        addDebugLog(`Sending to API: ${language}, blob size: ${processedBlob.size}`)
-        
-        // Make prediction with processed blob - WITH RETRY
-        let result = null
-        let retryCount = 0
-        const maxRetries = 2
-        
-        while (retryCount <= maxRetries) {
-          try {
-            result = await apiService.predictImage(processedBlob, language, false)
-            addDebugLog(`API response: ${JSON.stringify(result)}`)
-            break
-          } catch (apiError) {
-            retryCount++
-            addDebugLog(`API call failed (attempt ${retryCount}): ${apiError.message}`)
-            if (retryCount > maxRetries) throw apiError
-            await new Promise(r => setTimeout(r, 1000)) // Wait 1s before retry
-          }
-        }
+        formData.append('image', image.file)
+        formData.append('dataset_type', language)
 
-        // Safety check for result
-        if (!result) {
-          throw new Error('API returned null result')
-        }
+        // Make prediction
+        const result = await apiService.predictImage(formData)
         
         const resultData = {
           imageId: image.id,
@@ -409,18 +151,9 @@ const ImageUpload = ({ language, onPrediction }) => {
 
         newResults.push(resultData)
 
-        // Add to letter sequence if successful
-        if (result.success && result.prediction && result.prediction !== "No hand detected") {
-          addDebugLog(`Attempting to add "${result.prediction}" (confidence: ${result.confidence})`)
-          const wasAdded = addLetterToSequence(result.prediction, result.confidence)
-          addDebugLog(`Add result: ${wasAdded ? 'SUCCESS' : 'BLOCKED'}`)
-          
-          // Collect successful predictions for string
-          if (wasAdded) {
-            predictionLetters.push(result.prediction)
-          }
-        } else {
-          addDebugLog(`Skip adding to sequence: success=${result.success}, prediction="${result.prediction}"`)
+        // Collect successful predictions for string
+        if (result.success && result.prediction) {
+          predictionLetters.push(result.prediction)
         }
 
         // Update image status
@@ -435,15 +168,13 @@ const ImageUpload = ({ language, onPrediction }) => {
         // Send individual result to parent (for history)
         onPrediction(result, image.preview)
 
-        addDebugLog(`Image ${i + 1} result: ${result.prediction} (${(result.confidence * 100).toFixed(1)}%)`)
-
         // Small delay between requests
         if (i < selectedImages.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 500))
         }
 
       } catch (err) {
-        addDebugLog(`Error processing ${image.name}: ${err.message}`)
+        console.error(`Error predicting ${image.name}:`, err)
         
         const errorResult = {
           imageId: image.id,
@@ -468,19 +199,12 @@ const ImageUpload = ({ language, onPrediction }) => {
 
     setResults(newResults)
     
-    // Build prediction string dari sequence
-    if (letterSequence.length > 0) {
-      const finalString = letterSequence.map(item => item.letter).join('')
-      setPredictionString(finalString)
-      addDebugLog(`Final prediction string: "${finalString}"`)
-    } else {
-      addDebugLog('No letters in sequence after processing')
-    }
+    // Build prediction string (e.g., "A L V I N")
+    const finalString = predictionLetters.join(' ')
+    setPredictionString(finalString)
     
     setIsLoading(false)
     setProcessingIndex(-1)
-
-    addDebugLog('Batch processing complete')
   }
 
   // Get status color
@@ -496,47 +220,14 @@ const ImageUpload = ({ language, onPrediction }) => {
 
   return (
     <div className="space-y-4">
-      {/* Backend Status Indicator */}
-      {backendStatus && (
-        <div className="flex items-center justify-between p-3 rounded-lg border">
-          <div className="flex items-center gap-2">
-            <div className={`w-3 h-3 rounded-full ${
-              backendStatus === 'connected' ? 'bg-green-500' : 
-              backendStatus === 'disconnected' ? 'bg-red-500' : 
-              'bg-yellow-500'
-            }`}></div>
-            <span className="text-sm font-medium">
-              {
-                backendStatus === 'connected' ? 'Connected' :
-                backendStatus === 'disconnected' ? 'Disconnected' :
-                'Checking...'
-              }
-            </span>
-          </div>
-          
-          {backendStatus !== 'connected' && (
-            <button
-              onClick={checkBackendConnectivity}
-              className="text-blue-500 hover:text-blue-700 text-sm flex items-center gap-1"
-            >
-              <RefreshCw className="w-3 h-3" />
-              Retry Connection
-            </button>
-          )}
-        </div>
-      )}
-
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <Image className="w-5 h-5 text-blue-600" />
-            Multiple Image Upload
-          </h3>
+          <h3 className="text-lg font-semibold">Unggah Banyak Gambar</h3>
           <div className="flex items-center gap-2">
             {selectedImages.length > 0 && (
               <>
                 <span className="text-sm text-gray-600">
-                  {selectedImages.length} image{selectedImages.length > 1 ? 's' : ''} selected
+                  {selectedImages.length} Gambar{selectedImages.length > 1 ? 's' : ''} dipilih
                 </span>
                 <button
                   onClick={clearAllImages}
@@ -553,7 +244,7 @@ const ImageUpload = ({ language, onPrediction }) => {
               title="Add more images"
             >
               <Plus className="w-3 h-3" />
-              Add
+              Tambah
             </button>
           </div>
         </div>
@@ -575,16 +266,13 @@ const ImageUpload = ({ language, onPrediction }) => {
           >
             <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h4 className="text-lg font-medium text-gray-700 mb-2">
-              Drop your images here
+              Letakkan gambar Anda di sini
             </h4>
             <p className="text-gray-500 mb-4">
               atau klik untuk memilih files
             </p>
             <p className="text-sm text-gray-400">
-              Format: JPG, PNG, BMP • Max: 10MB per file • Up to 10 images total
-            </p>
-            <p className="text-sm text-blue-600 mt-2">
-              Menggunakan preprocessing yang sama dengan camera mode
+              Format: JPG, PNG, BMP • Maksimal: 10 MB per file • Total hingga 10 gambar
             </p>
             
             <input
@@ -599,21 +287,6 @@ const ImageUpload = ({ language, onPrediction }) => {
         ) : (
           /* Image Grid with Add Zone */
           <div className="space-y-4">
-            {/* Processing Status */}
-            {isLoading && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div className="flex items-center gap-2">
-                  <Loader className="w-4 h-4 animate-spin text-blue-600" />
-                  <span className="text-blue-800 font-medium">
-                    Processing {processingIndex + 1}/{selectedImages.length}...
-                  </span>
-                </div>
-                <p className="text-blue-700 text-sm mt-1">
-                  Menggunakan preprocessing yang sama dengan camera mode
-                </p>
-              </div>
-            )}
-
             {/* Image Grid */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
               {selectedImages.map((image, index) => (
@@ -684,7 +357,7 @@ const ImageUpload = ({ language, onPrediction }) => {
                 >
                   <div className="text-center">
                     <Plus className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-xs text-gray-500">Add More</p>
+                    <p className="text-xs text-gray-500">Tambahkan Lebih Banyak</p>
                   </div>
                 </div>
               )}
@@ -694,7 +367,7 @@ const ImageUpload = ({ language, onPrediction }) => {
             <div className="flex justify-center gap-4">
               <button
                 onClick={predictAllImages}
-                disabled={isLoading || selectedImages.length === 0 || backendStatus !== 'connected'}
+                disabled={isLoading || selectedImages.length === 0}
                 className="btn-primary flex items-center gap-2"
               >
                 {isLoading ? (
@@ -705,7 +378,7 @@ const ImageUpload = ({ language, onPrediction }) => {
                 ) : (
                   <>
                     <Image className="w-4 h-4" />
-                    Predict All ({selectedImages.length})
+                    Prediksi semua ({selectedImages.length})
                   </>
                 )}
               </button>
@@ -723,143 +396,52 @@ const ImageUpload = ({ language, onPrediction }) => {
         )}
       </div>
 
-      {/* Letter Sequence Display */}
-      {letterSequence.length > 0 && (
-        <div className="bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-200 rounded-xl p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="font-bold text-green-900 flex items-center gap-2">
-              Live Letter Sequence
-              <span className="bg-green-100 text-green-600 text-xs px-2 py-1 rounded-full">
-                {letterSequence.filter(item => !item.isSpace).length} letters
-              </span>
-            </h4>
-            <div className="flex items-center gap-2">
-              {sequenceHistory.length > 0 && (
-                <button
-                  onClick={undoLastLetter}
-                  className="text-orange-500 hover:text-orange-700 p-1"
-                  title="Undo last letter"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                </button>
-              )}
-              <button
-                onClick={clearSequence}
-                className="text-red-500 hover:text-red-700 p-1"
-                title="Clear sequence"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+      {/* Prediction String Display */}
+      {predictionString && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <h4 className="font-medium text-green-900 mb-4 text-center">🔤 Hasil Terjemahan:</h4>
+          <div className="text-center">
+            <div className="text-4xl font-bold text-green-600 mb-2 tracking-widest">
+              {predictionString}
             </div>
-          </div>
-          
-          {/* Letter Display */}
-          <div className="text-center mb-4">
-            <div className="flex justify-center items-center gap-3 flex-wrap mb-3">
-              {letterSequence.map((item, index) => (
-                <div
-                  key={item.id}
-                  className={`
-                    relative
-                    ${item.isSpace ? 'w-6 h-8 bg-gray-300' : 'w-14 h-14 bg-white border-2 border-green-300 shadow-lg'}
-                    rounded-lg flex items-center justify-center
-                    transition-all duration-300 hover:scale-105
-                    ${item.source === 'upload' ? 'ring-2 ring-blue-400' : ''}
-                  `}
-                  title={item.isSpace ? 'Space' : `${item.letter} (${(item.confidence * 100).toFixed(0)}%) - ${item.source}`}
-                >
-                  {!item.isSpace && (
-                    <>
-                      <span className="text-3xl font-bold text-green-600">
-                        {item.letter}
-                      </span>
-                      <span className="absolute -bottom-1 text-xs text-gray-500 bg-white px-1 rounded border">
-                        {(item.confidence * 100).toFixed(0)}%
-                      </span>
-                      <span className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full" title="Upload mode"></span>
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-            
-            {/* Statistics */}
-            <p className="text-green-700 text-sm mb-3">
-              {letterSequence.filter(item => !item.isSpace).length} letters • {letterSequence.filter(item => item.isSpace).length} spaces
-              • Confidence: {letterSequence.length > 0 ? 
-                (letterSequence.filter(item => !item.isSpace).reduce((acc, item) => acc + item.confidence, 0) / 
-                letterSequence.filter(item => !item.isSpace).length * 100).toFixed(0) : 0}% avg
+            <p className="text-green-700 text-sm">
+              {predictionString.replace(/\s/g, '').length} huruf berhasil diterjemahkan
             </p>
-            
-            {/* Action Buttons */}
-            <div className="flex justify-center gap-2 flex-wrap mb-3">
-              <button
-                onClick={addSpaceToSequence}
-                className="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-1"
-              >
-                <Space className="w-4 h-4" />
-                Add Space
-              </button>
-              <button
-                onClick={copySequenceText}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-1"
-              >
-                <Copy className="w-4 h-4" />
-                Copy Text
-              </button>
-            </div>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(predictionString.replace(/\s/g, ''))
+                alert('Hasil disalin ke clipboard!')
+              }}
+              className="mt-3 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm"
+            >
+              📋 Copy Hasil
+            </button>
           </div>
-          
-          {/* Final Text Preview */}
-          <div className="bg-white rounded-lg p-4 border border-green-200">
-            <p className="text-gray-600 text-sm mb-2">Hasil Terjemahan:</p>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600 mb-2 tracking-wider">
-                {letterSequence.map(item => item.letter).join('')}
-              </div>
-              <p className="text-green-700 text-sm">
-                {letterSequence.filter(item => !item.isSpace).length} huruf berhasil diterjemahkan
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Placeholder message when no letters yet */}
-      {letterSequence.length === 0 && selectedImages.length > 0 && backendStatus === 'connected' && (
-        <div className="bg-blue-50 border-2 border-dashed border-blue-200 rounded-xl p-6 text-center">
-          <div className="text-blue-400 mb-2">
-            <Type className="w-8 h-8 mx-auto" />
-          </div>
-          <h4 className="font-medium text-blue-900 mb-2">Siap untuk Terjemahan</h4>
-          <p className="text-blue-700 text-sm">
-            Huruf akan muncul secara otomatis di sini setelah prediksi pertama
-          </p>
         </div>
       )}
 
       {/* Batch Results Summary */}
       {results.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h4 className="font-medium text-blue-900 mb-3">Batch Results Summary:</h4>
+          <h4 className="font-medium text-blue-900 mb-3">Ringkasan Hasil Batch:</h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div className="text-center">
               <div className="text-lg font-bold text-blue-600">
                 {results.length}
               </div>
-              <div className="text-blue-700">Total Processed</div>
+              <div className="text-blue-700">Jumlah Diproses</div>
             </div>
             <div className="text-center">
               <div className="text-lg font-bold text-green-600">
                 {results.filter(r => r.result.success).length}
               </div>
-              <div className="text-green-700">Successful</div>
+              <div className="text-green-700">Berhasil</div>
             </div>
             <div className="text-center">
               <div className="text-lg font-bold text-red-600">
                 {results.filter(r => !r.result.success).length}
               </div>
-              <div className="text-red-700">Failed</div>
+              <div className="text-red-700">Gagal</div>
             </div>
             <div className="text-center">
               <div className="text-lg font-bold text-gray-600">
@@ -867,46 +449,13 @@ const ImageUpload = ({ language, onPrediction }) => {
                   ? (results.filter(r => r.result.success).reduce((acc, r) => acc + r.result.confidence, 0) / results.filter(r => r.result.success).length * 100).toFixed(0)
                   : 0}%
               </div>
-              <div className="text-gray-700">Avg Confidence</div>
+              <div className="text-gray-700">Rata-rata akurasi  </div>
             </div>
           </div>
         </div>
+        
       )}
       
-      {/* Instructions */}
-      {backendStatus === 'connected' && selectedImages.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h4 className="font-medium text-blue-900 mb-2">Petunjuk Penggunaan:</h4>
-          <ul className="text-blue-800 text-sm space-y-1">
-            <li>• <strong>Auto Letter Display:</strong> Huruf akan muncul otomatis saat prediksi berhasil (min 10% confidence)</li>
-            <li>• <strong>Multiple Upload:</strong> Tambahkan hingga 10 gambar untuk diproses sekaligus</li>
-            <li>• <strong>Sequence Building:</strong> Huruf secara otomatis ditambahkan ke sequence</li>
-            <li>• <strong>Optimal Results:</strong> Pastikan gambar dengan latar belakang yang kontras</li>
-          </ul>
-        </div>
-      )}
-      
-      {/* Debug Log (hanya tampil saat ada error) */}
-      {error && debugLog.length > 0 && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mt-4">
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="font-medium text-gray-700">Debug Log</h4>
-            <button 
-              onClick={() => setDebugLog([])}
-              className="text-gray-500 hover:text-gray-700 text-xs"
-            >
-              Clear Log
-            </button>
-          </div>
-          <div className="bg-gray-800 text-green-400 p-3 rounded text-xs font-mono h-32 overflow-y-auto">
-            {debugLog.map((log, i) => (
-              <div key={i} className="mb-1">
-                <span className="text-gray-500">[{log.time.split('T')[1].split('.')[0]}]</span> {log.message}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
