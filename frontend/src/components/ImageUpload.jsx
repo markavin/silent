@@ -8,7 +8,7 @@ const ImageUpload = ({ language, onPrediction }) => {
   const [error, setError] = useState(null)
   const [processingIndex, setProcessingIndex] = useState(-1)
   const [results, setResults] = useState([])
-  const [predictionString, setPredictionString] = useState('') // New: String hasil prediksi
+  const [predictionString, setPredictionString] = useState('')
   const fileInputRef = useRef(null)
 
   // Handle file selection (multiple/additive)
@@ -75,7 +75,7 @@ const ImageUpload = ({ language, onPrediction }) => {
             preview: e.target.result,
             name: file.name,
             size: file.size,
-            status: 'ready', // ready, processing, completed, error
+            status: 'ready',
             result: null,
             error: null
           })
@@ -85,7 +85,6 @@ const ImageUpload = ({ language, onPrediction }) => {
     })
 
     Promise.all(imagePromises).then((newImages) => {
-      // ADD to existing images (additive behavior)
       setSelectedImages(prev => [...prev, ...newImages])
     })
   }
@@ -100,11 +99,84 @@ const ImageUpload = ({ language, onPrediction }) => {
   const clearAllImages = () => {
     setSelectedImages([])
     setResults([])
-    setPredictionString('') // Clear string hasil
+    setPredictionString('')
     setError(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
+  }
+
+  // FIXED: Use same preprocessing as camera
+  const preprocessImageForPrediction = (file) => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      const img = new Image()
+
+      img.onload = () => {
+        try {
+          // Set canvas size - IDENTICAL to camera preprocessing
+          const maxSize = 1280
+          let { width, height } = img
+          
+          if (width > height) {
+            if (width > maxSize) {
+              height = (height * maxSize) / width
+              width = maxSize
+            }
+          } else {
+            if (height > maxSize) {
+              width = (width * maxSize) / height
+              height = maxSize
+            }
+          }
+
+          canvas.width = width
+          canvas.height = height
+
+          // Clear canvas
+          ctx.clearRect(0, 0, width, height)
+          ctx.imageSmoothingEnabled = true
+          ctx.imageSmoothingQuality = 'high'
+
+          // Draw image (no mirroring for uploaded images)
+          ctx.drawImage(img, 0, 0, width, height)
+
+          // CRITICAL: Apply same contrast enhancement as camera
+          const imageData = ctx.getImageData(0, 0, width, height)
+          const data = imageData.data
+          
+          for (let i = 0; i < data.length; i += 4) {
+            // IDENTICAL contrast enhancement to camera_test.py
+            data[i] = Math.min(255, Math.max(0, (data[i] - 128) * 1.1 + 128))
+            data[i + 1] = Math.min(255, Math.max(0, (data[i + 1] - 128) * 1.1 + 128))
+            data[i + 2] = Math.min(255, Math.max(0, (data[i + 2] - 128) * 1.1 + 128))
+          }
+          
+          ctx.putImageData(imageData, 0, 0)
+
+          // Convert to blob with same quality as camera
+          canvas.toBlob((blob) => {
+            resolve(blob)
+          }, 'image/jpeg', 0.92)
+
+        } catch (error) {
+          reject(new Error(`Image processing failed: ${error.message}`))
+        }
+      }
+
+      img.onerror = () => {
+        reject(new Error('Failed to load image for processing'))
+      }
+
+      // Load image from file
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        img.src = e.target.result
+      }
+      reader.onerror = () => reject(new Error('Failed to read image file'))
+      reader.readAsDataURL(file)
+    })
   }
 
   // Predict all images (batch processing)
@@ -114,10 +186,10 @@ const ImageUpload = ({ language, onPrediction }) => {
     setIsLoading(true)
     setError(null)
     setResults([])
-    setPredictionString('') // Reset string
+    setPredictionString('')
 
     const newResults = []
-    const predictionLetters = [] // New: Collect letters for string
+    const predictionLetters = []
 
     for (let i = 0; i < selectedImages.length; i++) {
       const image = selectedImages[i]
@@ -133,13 +205,13 @@ const ImageUpload = ({ language, onPrediction }) => {
       )
 
       try {
-        // Create form data
-        const formData = new FormData()
-        formData.append('image', image.file)
-        formData.append('dataset_type', language)
+        console.log(`Processing image ${i + 1}/${selectedImages.length}: ${image.name}`)
 
-        // Make prediction
-        const result = await apiService.predictImage(formData)
+        // FIXED: Use same preprocessing as camera
+        const processedBlob = await preprocessImageForPrediction(image.file)
+        
+        // Make prediction with processed blob
+        const result = await apiService.predictImage(processedBlob, language, false) // no mirror for uploads
         
         const resultData = {
           imageId: image.id,
@@ -152,7 +224,7 @@ const ImageUpload = ({ language, onPrediction }) => {
         newResults.push(resultData)
 
         // Collect successful predictions for string
-        if (result.success && result.prediction) {
+        if (result.success && result.prediction && result.prediction !== "No hand detected") {
           predictionLetters.push(result.prediction)
         }
 
@@ -168,13 +240,15 @@ const ImageUpload = ({ language, onPrediction }) => {
         // Send individual result to parent (for history)
         onPrediction(result, image.preview)
 
+        console.log(`Image ${i + 1} result:`, result.prediction, `(${(result.confidence * 100).toFixed(1)}%)`)
+
         // Small delay between requests
         if (i < selectedImages.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 500))
         }
 
       } catch (err) {
-        console.error(`Error predicting ${image.name}:`, err)
+        console.error(`Error processing ${image.name}:`, err)
         
         const errorResult = {
           imageId: image.id,
@@ -205,6 +279,8 @@ const ImageUpload = ({ language, onPrediction }) => {
     
     setIsLoading(false)
     setProcessingIndex(-1)
+
+    console.log('Batch processing complete. Final string:', finalString)
   }
 
   // Get status color
@@ -222,12 +298,12 @@ const ImageUpload = ({ language, onPrediction }) => {
     <div className="space-y-4">
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Unggah Banyak Gambar</h3>
+          <h3 className="text-lg font-semibold">Multiple Image Upload</h3>
           <div className="flex items-center gap-2">
             {selectedImages.length > 0 && (
               <>
                 <span className="text-sm text-gray-600">
-                  {selectedImages.length} Gambar{selectedImages.length > 1 ? 's' : ''} dipilih
+                  {selectedImages.length} image{selectedImages.length > 1 ? 's' : ''} selected
                 </span>
                 <button
                   onClick={clearAllImages}
@@ -244,7 +320,7 @@ const ImageUpload = ({ language, onPrediction }) => {
               title="Add more images"
             >
               <Plus className="w-3 h-3" />
-              Tambah
+              Add
             </button>
           </div>
         </div>
@@ -266,13 +342,16 @@ const ImageUpload = ({ language, onPrediction }) => {
           >
             <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h4 className="text-lg font-medium text-gray-700 mb-2">
-              Letakkan gambar Anda di sini
+              Drop your images here
             </h4>
             <p className="text-gray-500 mb-4">
               atau klik untuk memilih files
             </p>
             <p className="text-sm text-gray-400">
-              Format: JPG, PNG, BMP • Maksimal: 10 MB per file • Total hingga 10 gambar
+              Format: JPG, PNG, BMP • Max: 10MB per file • Up to 10 images total
+            </p>
+            <p className="text-xs text-blue-600 mt-2">
+              ✨ Sekarang menggunakan preprocessing yang sama dengan camera mode
             </p>
             
             <input
@@ -287,6 +366,21 @@ const ImageUpload = ({ language, onPrediction }) => {
         ) : (
           /* Image Grid with Add Zone */
           <div className="space-y-4">
+            {/* Processing Status */}
+            {isLoading && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <Loader className="w-4 h-4 animate-spin text-blue-600" />
+                  <span className="text-blue-800 font-medium">
+                    Processing {processingIndex + 1}/{selectedImages.length}...
+                  </span>
+                </div>
+                <p className="text-blue-700 text-sm mt-1">
+                  Menggunakan preprocessing yang sama dengan camera mode
+                </p>
+              </div>
+            )}
+
             {/* Image Grid */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
               {selectedImages.map((image, index) => (
@@ -357,7 +451,7 @@ const ImageUpload = ({ language, onPrediction }) => {
                 >
                   <div className="text-center">
                     <Plus className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-xs text-gray-500">Tambahkan Lebih Banyak</p>
+                    <p className="text-xs text-gray-500">Add More</p>
                   </div>
                 </div>
               )}
@@ -378,7 +472,7 @@ const ImageUpload = ({ language, onPrediction }) => {
                 ) : (
                   <>
                     <Image className="w-4 h-4" />
-                    Prediksi semua ({selectedImages.length})
+                    Predict All ({selectedImages.length})
                   </>
                 )}
               </button>
@@ -423,25 +517,25 @@ const ImageUpload = ({ language, onPrediction }) => {
       {/* Batch Results Summary */}
       {results.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h4 className="font-medium text-blue-900 mb-3">Ringkasan Hasil Batch:</h4>
+          <h4 className="font-medium text-blue-900 mb-3">Batch Results Summary:</h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div className="text-center">
               <div className="text-lg font-bold text-blue-600">
                 {results.length}
               </div>
-              <div className="text-blue-700">Jumlah Diproses</div>
+              <div className="text-blue-700">Total Processed</div>
             </div>
             <div className="text-center">
               <div className="text-lg font-bold text-green-600">
                 {results.filter(r => r.result.success).length}
               </div>
-              <div className="text-green-700">Berhasil</div>
+              <div className="text-green-700">Successful</div>
             </div>
             <div className="text-center">
               <div className="text-lg font-bold text-red-600">
                 {results.filter(r => !r.result.success).length}
               </div>
-              <div className="text-red-700">Gagal</div>
+              <div className="text-red-700">Failed</div>
             </div>
             <div className="text-center">
               <div className="text-lg font-bold text-gray-600">
@@ -449,11 +543,10 @@ const ImageUpload = ({ language, onPrediction }) => {
                   ? (results.filter(r => r.result.success).reduce((acc, r) => acc + r.result.confidence, 0) / results.filter(r => r.result.success).length * 100).toFixed(0)
                   : 0}%
               </div>
-              <div className="text-gray-700">Rata-rata akurasi  </div>
+              <div className="text-gray-700">Avg Confidence</div>
             </div>
           </div>
         </div>
-        
       )}
       
     </div>
