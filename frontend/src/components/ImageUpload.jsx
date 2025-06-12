@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Upload, Image, X, Loader, Trash2, Plus, Copy } from 'lucide-react'
+import { Upload, Image, X, Loader, Trash2, Plus, Camera, CameraOff, Type, RefreshCw } from 'lucide-react'
 import { apiService } from '../services/apiService'
 
 const ImageUpload = ({ language, onPrediction }) => {
@@ -9,8 +9,14 @@ const ImageUpload = ({ language, onPrediction }) => {
   const [processingIndex, setProcessingIndex] = useState(-1)
   const [results, setResults] = useState([])
   const [predictionString, setPredictionString] = useState('')
-  const [backendStatus, setBackendStatus] = useState(null)
   const fileInputRef = useRef(null)
+  const canvasRef = useRef(document.createElement('canvas'))
+  const [backendStatus, setBackendStatus] = useState(null)
+  
+  // Letter sequence system (sama seperti CameraCapture)
+  const [letterSequence, setLetterSequence] = useState([])
+  const lastPredictionRef = useRef(0)
+  const [sequenceHistory, setSequenceHistory] = useState([])
 
   // Check backend connectivity on component mount
   useEffect(() => {
@@ -132,38 +138,121 @@ const ImageUpload = ({ language, onPrediction }) => {
     setSelectedImages([])
     setResults([])
     setPredictionString('')
+    setLetterSequence([])
     setError(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
   }
 
-  // FIXED: Use EXACT same preprocessing as CameraCapture
+  // Letter sequence functions (seperti di CameraCapture)
+  const addLetterToSequence = (prediction, confidence) => {
+    const currentTime = Date.now()
+    
+    // Universal cooldown
+    if (currentTime - lastPredictionRef.current < 2500) {
+      console.log(`Cooldown active, skipping: ${prediction} (${currentTime - lastPredictionRef.current}ms ago)`)
+      return false
+    }
+    
+    // Check for exact same letter in last 5 seconds
+    const recentSame = letterSequence.find(item => 
+      item.letter === prediction && 
+      (currentTime - new Date(item.timestamp).getTime()) < 5000
+    )
+    
+    if (recentSame) {
+      console.log(`Duplicate blocked: ${prediction} already exists in last 5 seconds`)
+      return false
+    }
+    
+    // Low confidence threshold
+    if (confidence >= 0.2) {
+      const newLetter = {
+        id: currentTime,
+        letter: prediction,
+        confidence: confidence,
+        timestamp: new Date(),
+        source: 'upload'
+      }
+      
+      setSequenceHistory(prev => [...prev.slice(-9), [...letterSequence]])
+      setLetterSequence(prev => {
+        const newSequence = [...prev, newLetter]
+        console.log(`Letter added: ${prediction} (${(confidence * 100).toFixed(1)}%) from upload mode - Total: ${newSequence.length}`)
+        return newSequence
+      })
+      
+      lastPredictionRef.current = currentTime
+      return true
+    } else {
+      console.log(`Confidence too low: ${prediction} (${(confidence * 100).toFixed(1)}%)`)
+      return false
+    }
+  }
+
+  const clearSequence = () => {
+    setSequenceHistory(prev => [...prev.slice(-9), [...letterSequence]])
+    setLetterSequence([])
+    console.log('Letter sequence cleared')
+  }
+
+  const undoLastLetter = () => {
+    if (sequenceHistory.length > 0) {
+      const previousSequence = sequenceHistory[sequenceHistory.length - 1]
+      setLetterSequence(previousSequence)
+      setSequenceHistory(prev => prev.slice(0, -1))
+      console.log('Undid last letter')
+    }
+  }
+
+  const addSpaceToSequence = () => {
+    const spaceItem = {
+      id: Date.now(),
+      letter: ' ',
+      confidence: 1.0,
+      timestamp: new Date(),
+      isSpace: true,
+      source: 'manual'
+    }
+    
+    setSequenceHistory(prev => [...prev.slice(-9), [...letterSequence]])
+    setLetterSequence(prev => [...prev, spaceItem])
+    
+    console.log('Space added to sequence')
+  }
+
+  const copySequenceText = () => {
+    const text = letterSequence.map(item => item.letter).join('')
+    navigator.clipboard.writeText(text)
+    alert('Text copied to clipboard!')
+  }
+
+  // Image processing function identik dengan CameraCapture
   const preprocessImageForPrediction = (file) => {
     return new Promise((resolve, reject) => {
-      const canvas = document.createElement('canvas')
+      const canvas = canvasRef.current
       const ctx = canvas.getContext('2d')
       const img = new Image()
 
       img.onload = () => {
         try {
-          // EXACT same dimensions as CameraCapture
+          // Set canvas size - IDENTIK dengan camera preprocessing
           canvas.width = img.width || 1280
           canvas.height = img.height || 720
 
-          // Clear canvas and set smoothing (same as CameraCapture)
+          // Clear canvas
           ctx.clearRect(0, 0, canvas.width, canvas.height)
           ctx.imageSmoothingEnabled = true
           ctx.imageSmoothingQuality = 'high'
 
-          // Draw image (no mirroring for uploaded images - same as CameraCapture when isMirrored=false)
+          // Draw image (no mirroring for uploaded images)
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
 
-          // CRITICAL: Apply EXACT same contrast enhancement as CameraCapture
+          // CRITICAL: Apply IDENTICAL contrast enhancement as camera_test.py
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
           const data = imageData.data
           
-          // IDENTICAL algorithm to CameraCapture
           for (let i = 0; i < data.length; i += 4) {
             data[i] = Math.min(255, Math.max(0, (data[i] - 128) * 1.1 + 128))
             data[i + 1] = Math.min(255, Math.max(0, (data[i + 1] - 128) * 1.1 + 128))
@@ -172,13 +261,9 @@ const ImageUpload = ({ language, onPrediction }) => {
           
           ctx.putImageData(imageData, 0, 0)
 
-          // EXACT same blob conversion as CameraCapture
+          // Convert to blob with same quality as camera
           canvas.toBlob((blob) => {
-            if (blob) {
-              resolve(blob)
-            } else {
-              reject(new Error('Failed to create blob from canvas'))
-            }
+            resolve(blob)
           }, 'image/jpeg', 0.92)
 
         } catch (error) {
@@ -203,7 +288,7 @@ const ImageUpload = ({ language, onPrediction }) => {
   // Predict all images (batch processing)
   const predictAllImages = async () => {
     if (selectedImages.length === 0) return
-
+    
     if (backendStatus !== 'connected') {
       setError('Backend tidak tersedia. Cek koneksi ke server Python.')
       return
@@ -233,16 +318,11 @@ const ImageUpload = ({ language, onPrediction }) => {
       try {
         console.log(`Processing image ${i + 1}/${selectedImages.length}: ${image.name}`)
 
-        // FIXED: Use EXACT same preprocessing as CameraCapture
+        // IDENTIK preprocessing seperti camera
         const processedBlob = await preprocessImageForPrediction(image.file)
         
-        console.log('Image processed, making prediction...')
-        console.log('Using language:', language)
-        
-        // Make prediction with processed blob - EXACT same API call as CameraCapture
-        const result = await apiService.predictImage(processedBlob, language, false) // isMirrored=false for uploads
-        
-        console.log('Prediction result:', result)
+        // Make prediction with processed blob
+        const result = await apiService.predictImage(processedBlob, language, false) // no mirror for uploads
         
         const resultData = {
           imageId: image.id,
@@ -254,12 +334,16 @@ const ImageUpload = ({ language, onPrediction }) => {
 
         newResults.push(resultData)
 
-        // Collect successful predictions for string (same logic as CameraCapture)
+        // Add to letter sequence if successful (seperti di CameraCapture)
         if (result.success && result.prediction && result.prediction !== "No hand detected") {
-          predictionLetters.push(result.prediction)
-          console.log(`Added to sequence: ${result.prediction} (confidence: ${result.confidence})`)
-        } else {
-          console.log(`Skipped: success=${result.success}, prediction="${result.prediction}"`)
+          console.log(`Attempting to add "${result.prediction}" (confidence: ${result.confidence})`)
+          const wasAdded = addLetterToSequence(result.prediction, result.confidence)
+          console.log(`Add result: ${wasAdded ? 'SUCCESS' : 'BLOCKED'}`)
+          
+          // Collect successful predictions for string
+          if (wasAdded) {
+            predictionLetters.push(result.prediction)
+          }
         }
 
         // Update image status
@@ -274,9 +358,9 @@ const ImageUpload = ({ language, onPrediction }) => {
         // Send individual result to parent (for history)
         onPrediction(result, image.preview)
 
-        console.log(`Image ${i + 1} result: ${result.prediction} (${(result.confidence * 100).toFixed(1)}%)`)
+        console.log(`Image ${i + 1} result:`, result.prediction, `(${(result.confidence * 100).toFixed(1)}%)`)
 
-        // Small delay between requests (same as batch processing best practice)
+        // Small delay between requests
         if (i < selectedImages.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 500))
         }
@@ -284,21 +368,11 @@ const ImageUpload = ({ language, onPrediction }) => {
       } catch (err) {
         console.error(`Error processing ${image.name}:`, err)
         
-        let errorMessage = err.message || 'Failed to predict image'
-        
-        // Same error handling as CameraCapture
-        if (err.message.includes('Network error')) {
-          errorMessage = 'Tidak bisa menghubungi server. Pastikan backend Python berjalan.'
-          setBackendStatus('disconnected')
-        } else if (err.message.includes('timeout')) {
-          errorMessage = 'Server terlalu lama merespons. Coba lagi.'
-        }
-        
         const errorResult = {
           imageId: image.id,
           imageName: image.name,
           imagePreview: image.preview,
-          result: { success: false, error: errorMessage },
+          result: { success: false, error: err.message },
           timestamp: new Date()
         }
 
@@ -308,29 +382,24 @@ const ImageUpload = ({ language, onPrediction }) => {
         setSelectedImages(prev => 
           prev.map(img => 
             img.id === image.id 
-              ? { ...img, status: 'error', error: errorMessage }
+              ? { ...img, status: 'error', error: err.message }
               : img
           )
         )
-
-        // Send error to parent
-        onPrediction({
-          success: false,
-          error: errorMessage
-        })
       }
     }
 
     setResults(newResults)
     
-    // Build prediction string (space-separated like CameraCapture sequence)
-    const finalString = predictionLetters.join(' ')
-    setPredictionString(finalString)
+    // Build prediction string dari sequence
+    if (letterSequence.length > 0) {
+      setPredictionString(letterSequence.map(item => item.letter).join(''))
+    }
     
     setIsLoading(false)
     setProcessingIndex(-1)
 
-    console.log('Batch processing complete. Final string:', finalString)
+    console.log('Batch processing complete.')
   }
 
   // Get status color
@@ -344,16 +413,9 @@ const ImageUpload = ({ language, onPrediction }) => {
     }
   }
 
-  // Copy prediction string
-  const copyPredictionString = () => {
-    const textToCopy = predictionString.replace(/\s/g, '') // Remove spaces for copying
-    navigator.clipboard.writeText(textToCopy)
-    alert('Text copied to clipboard!')
-  }
-
   return (
     <div className="space-y-4">
-      {/* Backend Status Indicator - Same as CameraCapture */}
+      {/* Backend Status Indicator */}
       {backendStatus && (
         <div className="flex items-center justify-between p-3 rounded-lg border">
           <div className="flex items-center gap-2">
@@ -374,8 +436,9 @@ const ImageUpload = ({ language, onPrediction }) => {
           {backendStatus !== 'connected' && (
             <button
               onClick={checkBackendConnectivity}
-              className="text-blue-500 hover:text-blue-700 text-sm"
+              className="text-blue-500 hover:text-blue-700 text-sm flex items-center gap-1"
             >
+              <RefreshCw className="w-3 h-3" />
               Retry Connection
             </button>
           )}
@@ -384,7 +447,10 @@ const ImageUpload = ({ language, onPrediction }) => {
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Multiple Image Upload</h3>
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Image className="w-5 h-5 text-blue-600" />
+            Multiple Image Upload
+          </h3>
           <div className="flex items-center gap-2">
             {selectedImages.length > 0 && (
               <>
@@ -414,10 +480,7 @@ const ImageUpload = ({ language, onPrediction }) => {
         {/* Error Message */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-            <div className="flex items-center gap-2 text-red-700">
-              <span className="text-red-500">⚠️</span>
-              <p className="text-sm">{error}</p>
-            </div>
+            <p className="text-red-700 text-sm">{error}</p>
           </div>
         )}
 
@@ -439,8 +502,8 @@ const ImageUpload = ({ language, onPrediction }) => {
             <p className="text-sm text-gray-400">
               Format: JPG, PNG, BMP • Max: 10MB per file • Up to 10 images total
             </p>
-            <p className="text-xs text-blue-600 mt-2">
-              Menggunakan preprocessing yang identik dengan camera mode
+            <p className="text-sm text-blue-600 mt-2">
+              Menggunakan preprocessing yang sama dengan camera mode
             </p>
             
             <input
@@ -465,7 +528,7 @@ const ImageUpload = ({ language, onPrediction }) => {
                   </span>
                 </div>
                 <p className="text-blue-700 text-sm mt-1">
-                  Menggunakan preprocessing identik dengan camera mode
+                  Menggunakan preprocessing yang sama dengan camera mode
                 </p>
               </div>
             )}
@@ -551,7 +614,7 @@ const ImageUpload = ({ language, onPrediction }) => {
               <button
                 onClick={predictAllImages}
                 disabled={isLoading || selectedImages.length === 0 || backendStatus !== 'connected'}
-                className="btn-primary flex items-center gap-2 disabled:opacity-50"
+                className="btn-primary flex items-center gap-2"
               >
                 {isLoading ? (
                   <>
@@ -579,38 +642,88 @@ const ImageUpload = ({ language, onPrediction }) => {
         )}
       </div>
 
-      {/* Prediction String Display - Same styling as CameraCapture */}
-      {predictionString && (
+      {/* Letter Sequence Display (Seperti di CameraCapture) */}
+      {letterSequence.length > 0 && (
         <div className="bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-200 rounded-xl p-6">
-          <h4 className="font-bold text-green-900 mb-4 flex items-center gap-2">
-            Hasil Terjemahan Upload
-            <span className="bg-green-100 text-green-600 text-xs px-2 py-1 rounded-full">
-              {predictionString.replace(/\s/g, '').length} letters
-            </span>
-          </h4>
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="font-bold text-green-900 flex items-center gap-2">
+              🔤 Live Letter Sequence
+              <span className="bg-green-100 text-green-600 text-xs px-2 py-1 rounded-full">
+                {letterSequence.filter(item => !item.isSpace).length} letters
+              </span>
+            </h4>
+            <div className="flex items-center gap-2">
+              {sequenceHistory.length > 0 && (
+                <button
+                  onClick={undoLastLetter}
+                  className="text-orange-500 hover:text-orange-700 p-1"
+                  title="Undo last letter"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+              )}
+              <button
+                onClick={clearSequence}
+                className="text-red-500 hover:text-red-700 p-1"
+                title="Clear sequence"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
           
           {/* Letter Display */}
           <div className="text-center mb-4">
             <div className="flex justify-center items-center gap-3 flex-wrap mb-3">
-              {predictionString.split(' ').map((letter, index) => (
+              {letterSequence.map((item, index) => (
                 <div
-                  key={index}
-                  className="w-14 h-14 bg-white border-2 border-green-300 shadow-lg rounded-lg flex items-center justify-center transition-all duration-300 hover:scale-105"
+                  key={item.id}
+                  className={`
+                    relative
+                    ${item.isSpace ? 'w-6 h-8 bg-gray-300' : 'w-14 h-14 bg-white border-2 border-green-300 shadow-lg'}
+                    rounded-lg flex items-center justify-center
+                    transition-all duration-300 hover:scale-105
+                    ${item.source === 'upload' ? 'ring-2 ring-blue-400' : ''}
+                  `}
+                  title={item.isSpace ? 'Space' : `${item.letter} (${(item.confidence * 100).toFixed(0)}%) - ${item.source}`}
                 >
-                  <span className="text-3xl font-bold text-green-600">
-                    {letter}
-                  </span>
+                  {!item.isSpace && (
+                    <>
+                      <span className="text-3xl font-bold text-green-600">
+                        {item.letter}
+                      </span>
+                      <span className="absolute -bottom-1 text-xs text-gray-500 bg-white px-1 rounded border">
+                        {(item.confidence * 100).toFixed(0)}%
+                      </span>
+                      <span className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full" title="Upload mode"></span>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
             
+            {/* Statistics */}
+            <p className="text-green-700 text-sm mb-3">
+              {letterSequence.filter(item => !item.isSpace).length} letters • {letterSequence.filter(item => item.isSpace).length} spaces
+              • Confidence: {letterSequence.length > 0 ? 
+                (letterSequence.filter(item => !item.isSpace).reduce((acc, item) => acc + item.confidence, 0) / 
+                letterSequence.filter(item => !item.isSpace).length * 100).toFixed(0) : 0}% avg
+            </p>
+            
             {/* Action Buttons */}
             <div className="flex justify-center gap-2 flex-wrap mb-3">
               <button
-                onClick={copyPredictionString}
+                onClick={addSpaceToSequence}
+                className="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-1"
+              >
+                <span className="w-3 h-3">-</span>
+                Add Space
+              </button>
+              <button
+                onClick={copySequenceText}
                 className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-1"
               >
-                <Copy className="w-3 h-3" />
+                <span className="w-3 h-3">+</span>
                 Copy Text
               </button>
             </div>
@@ -621,13 +734,26 @@ const ImageUpload = ({ language, onPrediction }) => {
             <p className="text-gray-600 text-sm mb-2">Hasil Terjemahan:</p>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600 mb-2 tracking-wider">
-                {predictionString.replace(/\s/g, '')}
+                {letterSequence.map(item => item.letter).join('')}
               </div>
               <p className="text-green-700 text-sm">
-                {predictionString.replace(/\s/g, '').length} huruf berhasil diterjemahkan
+                {letterSequence.filter(item => !item.isSpace).length} huruf berhasil diterjemahkan
               </p>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Placeholder message when no letters yet */}
+      {letterSequence.length === 0 && selectedImages.length > 0 && backendStatus === 'connected' && (
+        <div className="bg-blue-50 border-2 border-dashed border-blue-200 rounded-xl p-6 text-center">
+          <div className="text-blue-400 mb-2">
+            <Type className="w-8 h-8 mx-auto" />
+          </div>
+          <h4 className="font-medium text-blue-900 mb-2">Siap untuk Terjemahan</h4>
+          <p className="text-blue-700 text-sm">
+            Huruf akan muncul secara otomatis di sini setelah prediksi pertama
+          </p>
         </div>
       )}
 
@@ -665,17 +791,20 @@ const ImageUpload = ({ language, onPrediction }) => {
           </div>
         </div>
       )}
-
-      {/* Instructions - Same as CameraCapture */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h4 className="font-medium text-blue-900 mb-2">Petunjuk Penggunaan:</h4>
-        <ul className="text-blue-800 text-sm space-y-1">
-          <li>• Upload multiple images (max 10 files, 10MB each)</li>
-          <li>• Menggunakan preprocessing identik dengan camera mode</li>
-          <li>• Batch processing dengan confidence tracking</li>
-          <li>• Hasil ditampilkan dalam format sequence seperti camera</li>
-        </ul>
-      </div>
+      
+      {/* Instructions */}
+      {backendStatus === 'connected' && selectedImages.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h4 className="font-medium text-blue-900 mb-2">📋 Petunjuk Penggunaan:</h4>
+          <ul className="text-blue-800 text-sm space-y-1">
+            <li>• <strong>Auto Letter Display:</strong> Huruf akan muncul otomatis saat prediksi berhasil (min 20%)</li>
+            <li>• <strong>Multiple Upload:</strong> Tambahkan hingga 10 gambar untuk diproses sekaligus</li>
+            <li>• <strong>Sequence Building:</strong> Huruf secara otomatis ditambahkan ke sequence</li>
+            <li>• <strong>Optimal Results:</strong> Pastikan gambar dengan latar belakang yang kontras</li>
+          </ul>
+        </div>
+      )}
+      
     </div>
   )
 }
