@@ -101,6 +101,7 @@ Ikuti langkah-langkah berikut untuk mengatur proyek secara lokal:
 ## Deployment
 
 Proyek ini telah menyertakan file konfigurasi `vercel.json` untuk deployment di Vercel. Cukup push repositori ke GitHub, hubungkan ke Vercel, dan lakukan deployment.
+
 LINK : https://silent-sign.vercel.app/
 
 ## Kontribusi
