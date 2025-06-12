@@ -437,6 +437,7 @@ const CameraCapture = ({ language, onPrediction }) => {
           setTimeout(() => {
             if (isTimerActiveRef.current) {
               predictFromCamera('timer')
+              isTimerActiveRef.current = false
             }
           }, 200)
           
@@ -897,13 +898,6 @@ const CameraCapture = ({ language, onPrediction }) => {
           <li>• <strong>Auto Capture:</strong> Ambil foto otomatis setiap 3 detik - huruf langsung muncul</li>
           <li>• <strong>Timer Capture:</strong> Countdown capture - huruf juga langsung muncul</li>
           <li>• <strong>Manual Capture:</strong> Klik "Capture Now" - huruf akan ditambahkan otomatis</li>
-          <li>• <strong>Mirror Mode ON:</strong> Untuk tangan kiri (natural movement)</li>
-          <li>• <strong>Mirror Mode OFF:</strong> Untuk tangan kanan atau 2 tangan (BISINDO)</li>
-          <li>• Confidence minimum 20% untuk ditambahkan ke sequence</li>
-          <li>• Cooldown global 2.5 detik + duplicate check 5 detik untuk semua mode</li>
-          <li>• Mengabaikan "No hand detected" secara otomatis</li>
-          <li>• Add Space tidak mengganggu prediksi selanjutnya</li>
-          <li>• Gunakan "Add Space", "Undo", dan "Copy" untuk kontrol sequence</li>
         </ul>
       </div>
     </div>
