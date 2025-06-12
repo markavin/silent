@@ -1,55 +1,56 @@
-
 # Silent Frontend
 
-Proyek ini adalah bagian frontend dari aplikasi Silent, dibangun menggunakan alat pengembangan web modern. Proyek ini memanfaatkan teknologi seperti Vite, TailwindCSS, dan PostCSS untuk pengembangan yang cepat, bersama dengan ESLint untuk menjaga kualitas dan konsistensi kode.
+Proyek ini adalah bagian frontend dari aplikasi **SILENT**, dibangun menggunakan alat pengembangan web modern. Proyek ini memanfaatkan teknologi seperti **Vite**, **TailwindCSS**, dan **PostCSS** untuk pengembangan yang cepat, serta **ESLint** untuk menjaga kualitas dan konsistensi kode.
 
 ## Struktur Proyek
 
-Folder proyek ini memiliki struktur sebagai berikut:
-silent-frontend/
-└── FRONTEND FILES
-    └── frontend/                   ← React application root
-        ├── src/
-        │   ├── components/
-        │   │   ├── CameraCapture.jsx     ← Kamera real-time
-        │   │   ├── ImageUpload.jsx       ← Upload gambar
-        │   │   ├── Header.jsx            ← Navigasi atas
-        │   │   ├── Footer.jsx            ← Footer aplikasi
-        │   │   ├── LanguageSelector.jsx  ← Pilih bahasa
-        │   │   ├── PredictionResult.jsx  ← Tampilkan hasil prediksi
-        │   │   ├── ModelInfo.jsx         ← Info model ML
-        │   │   ├── DebugPanel.jsx        ← Debugging tools (opsional)
-        │   │   └── YoutubeEmbed.jsx      ← Embed video YouTube
-        │   ├── services/
-        │   │   └── apiService.js         ← Komunikasi API ke backend
-        │   ├── utils/
-        │   │   └── cameraUtils.js        ← Utilitas kamera
-        │   ├── assets/                   ← Gambar, ikon, dll
-        │   ├── App.jsx                   ← Komponen utama aplikasi
-        │   ├── main.jsx                  ← Entry point React
-        │   └── index.css                 ← Styling utama
-        ├── index.html                    ← Template HTML
-        ├── package.json                  ← Dependensi Node.js
-        ├── package-lock.json             ← Lockfile dependensi
-        ├── tailwind.config.js            ← Konfigurasi Tailwind CSS
-        ├── postcss.config.js             ← Konfigurasi PostCSS
-        ├── vite.config.js                ← Konfigurasi Vite
-        ├── server.js                     ← Server dev frontend
-        ├── vercel.json                   ← Konfigurasi deployment Vercel
-        ├── .eslintrc.cjs                 ← Konfigurasi ESLint
-        └── .gitignore                    ← Daftar file yang diabaikan Git
+Berikut adalah struktur folder proyek dalam format pohon direktori:
 
-        
+```bash
+silent-frontend-main/
+└── 🌐 FRONTEND FILES
+    └── frontend/                     ← Root aplikasi React
+        ├── src/
+        │   ├── components/           ← Komponen UI
+        │   │   ├── CameraCapture.jsx       ← Antarmuka kamera
+        │   │   ├── ImageUpload.jsx         ← Unggah gambar
+        │   │   ├── Header.jsx              ← Navigasi atas
+        │   │   ├── Footer.jsx              ← Bagian bawah aplikasi
+        │   │   ├── LanguageSelector.jsx    ← Pemilih bahasa
+        │   │   ├── PredictionResult.jsx    ← Tampilan hasil prediksi
+        │   │   ├── ModelInfo.jsx           ← Informasi model ML
+        │   │   ├── DebugPanel.jsx          ← Panel debugging (opsional)
+        │   │   └── YoutubeEmbed.jsx        ← Menyematkan video YouTube
+        │   ├── services/
+        │   │   └── apiService.js           ← Komunikasi dengan API backend
+        │   ├── utils/
+        │   │   └── cameraUtils.js          ← Utilitas untuk kamera
+        │   ├── assets/                     ← Gambar dan ikon
+        │   ├── App.jsx                     ← Komponen utama React
+        │   ├── main.jsx                    ← Titik masuk React
+        │   └── index.css                   ← Gaya utama
+        ├── index.html                      ← Template HTML
+        ├── package.json                    ← Dependensi Node.js
+        ├── package-lock.json               ← Lockfile dependensi
+        ├── tailwind.config.js              ← Konfigurasi Tailwind CSS
+        ├── postcss.config.js               ← Konfigurasi PostCSS
+        ├── vite.config.js                  ← Konfigurasi Vite
+        ├── server.js                       ← Server pengembangan frontend
+        ├── vercel.json                     ← Konfigurasi untuk deployment Vercel
+        ├── .eslintrc.cjs                   ← Konfigurasi ESLint
+        └── .gitignore                      ← File yang diabaikan Git
+```
+
 ## Instalasi
 
-Ikuti langkah-langkah berikut untuk mengatur proyek secara lokal.
+Ikuti langkah-langkah berikut untuk mengatur proyek secara lokal:
 
-## Prasyarat
+### Prasyarat
 
 - Node.js (v16 atau lebih baru)
 - npm (v7 atau lebih baru)
 
-## Langkah-langkah
+### Langkah-langkah
 
 1. Clone repositori:
    ```bash
@@ -67,25 +68,24 @@ Ikuti langkah-langkah berikut untuk mengatur proyek secara lokal.
    npm run dev
    ```
 
-4. Buka browser Anda dan kunjungi `http://localhost:3000` untuk melihat aplikasi.
+4. Buka browser dan kunjungi `http://localhost:3000` untuk melihat aplikasi.
 
 ## Konfigurasi
 
-- **Vite** digunakan untuk membundel dan melayani aplikasi. File konfigurasi `vite.config.js` memungkinkan kustomisasi pengaturan build, plugin, dan lainnya.
-- **TailwindCSS** dikonfigurasi menggunakan `tailwind.config.js` untuk pendekatan CSS berbasis utilitas.
-- **PostCSS** disiapkan dengan `postcss.config.js` untuk memproses CSS, memungkinkan fitur modern.
-- **ESLint** dikonfigurasi melalui `.eslintrc.cjs` untuk menjaga praktik pengkodean yang konsisten.
+- **Vite** digunakan untuk membundel dan melayani aplikasi. File konfigurasi: `vite.config.js`
+- **TailwindCSS** dikonfigurasi melalui `tailwind.config.js` untuk pendekatan styling berbasis utilitas.
+- **PostCSS** disiapkan di `postcss.config.js` untuk memproses CSS modern.
+- **ESLint** diatur melalui `.eslintrc.cjs` untuk menjaga gaya penulisan kode.
 
 ## Deployment
 
-Untuk melakukan deployment proyek menggunakan Vercel, proyek ini sudah menyertakan file konfigurasi `vercel.json` yang diperlukan. Cukup dorong proyek Anda ke repositori Git, hubungkan ke Vercel, dan lakukan deployment.
+Proyek ini telah menyertakan file konfigurasi `vercel.json` untuk deployment di Vercel. Cukup push repositori ke GitHub, hubungkan ke Vercel, dan lakukan deployment.
+LINK : https://silent-sign.vercel.app/
 
 ## Kontribusi
 
-1. Fork repositori.
-2. Buat cabang fitur Anda (`git checkout -b feature/fitur-anda`).
-3. Commit perubahan Anda (`git commit -am 'Tambah fitur baru'`).
-4. Dorong cabang ke repositori (`git push origin feature/fitur-anda`).
-5. Buka pull request.
-
-
+1. Fork repositori ini.
+2. Buat branch baru untuk fitur (`git checkout -b fitur/namafitur`).
+3. Commit perubahan (`git commit -am 'Tambah fitur x'`).
+4. Push ke repositori Anda (`git push origin fitur/namafitur`).
+5. Buka pull request ke repositori utama.
