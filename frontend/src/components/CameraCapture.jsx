@@ -24,6 +24,8 @@ const CameraCapture = ({ language, onPrediction }) => {
   const [countdown, setCountdown] = useState(0)
   const [captureCount, setCaptureCount] = useState(0)
 
+  const [facingMode, setFacingMode] = useState('user')
+  
   // IMPROVED: Auto Letter Display System (Always Active)
   const [letterSequence, setLetterSequence] = useState([])
   // GLOBAL: Track last prediction to prevent ANY double calls
@@ -81,7 +83,7 @@ const CameraCapture = ({ language, onPrediction }) => {
       
       const constraints = { 
         video: {
-          facingMode: 'user',
+          facingMode: facingMode,
           width: { ideal: 1280, min: 640 },
           height: { ideal: 720, min: 480 },
           frameRate: { ideal: 30 }
@@ -182,7 +184,7 @@ const CameraCapture = ({ language, onPrediction }) => {
   }
 
   const stopCamera = () => {
-    console.log('🛑 Stopping camera...')
+    console.log('Stopping camera...')
     
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop())
@@ -219,7 +221,7 @@ const CameraCapture = ({ language, onPrediction }) => {
     predictionSourceRef.current = 'manual'
     setCountdown(0)
     
-    console.log('🧹 CLEAN: All timers and flags reset')
+    console.log('CLEAN: All timers and flags reset')
   }
 
   const captureImage = useCallback(async () => {
@@ -267,7 +269,7 @@ const CameraCapture = ({ language, onPrediction }) => {
     
     // Universal cooldown for ALL modes
     if (currentTime - lastPredictionRef.current < 2500) {
-      console.log(`⏳ UNIVERSAL Cooldown active, skipping: ${prediction} (${currentTime - lastPredictionRef.current}ms ago)`)
+      console.log(`UNIVERSAL Cooldown active, skipping: ${prediction} (${currentTime - lastPredictionRef.current}ms ago)`)
       return false
     }
     
@@ -278,7 +280,7 @@ const CameraCapture = ({ language, onPrediction }) => {
     )
     
     if (recentSame) {
-      console.log(`🚫 UNIVERSAL DUPLICATE BLOCKED: ${prediction} already exists in last 5 seconds`)
+      console.log(`UNIVERSAL DUPLICATE BLOCKED: ${prediction} already exists in last 5 seconds`)
       return false
     }
     
@@ -295,15 +297,15 @@ const CameraCapture = ({ language, onPrediction }) => {
       setSequenceHistory(prev => [...prev.slice(-9), [...letterSequence]])
       setLetterSequence(prev => {
         const newSequence = [...prev, newLetter]
-        console.log(`✅ UNIVERSAL ADD: ${prediction} (${(confidence * 100).toFixed(1)}%) from ${newLetter.source} mode - Total: ${newSequence.length}`)
+        console.log(`UNIVERSAL ADD: ${prediction} (${(confidence * 100).toFixed(1)}%) from ${newLetter.source} mode - Total: ${newSequence.length}`)
         return newSequence
       })
       
       lastPredictionRef.current = currentTime
-      console.log(`🎯 Letter added universally: ${prediction} from ${newLetter.source} mode`)
+      console.log(`Letter added universally: ${prediction} from ${newLetter.source} mode`)
       return true
     } else {
-      console.log(`❌ Confidence too low: ${prediction} (${(confidence * 100).toFixed(1)}%)`)
+      console.log(`Confidence too low: ${prediction} (${(confidence * 100).toFixed(1)}%)`)
       return false
     }
   }
@@ -339,7 +341,7 @@ const CameraCapture = ({ language, onPrediction }) => {
     setLetterSequence(prev => [...prev, spaceItem])
     
     // DON'T update lastPredictionTime - this allows next prediction to work normally
-    console.log('✅ Space added to sequence - prediction flow continues normally')
+    console.log('Space added to sequence - prediction flow continues normally')
   }
 
   const copySequenceText = () => {
@@ -385,15 +387,15 @@ const CameraCapture = ({ language, onPrediction }) => {
       
       // SUPER STRICT: Only add once, with strong duplicate prevention
       if (result.success && result.prediction && result.prediction !== "No hand detected") {
-        console.log(`🎯 ATTEMPTING to add "${result.prediction}" (confidence: ${result.confidence})`)
+        console.log(`ATTEMPTING to add "${result.prediction}" (confidence: ${result.confidence})`)
         const wasAdded = addLetterToSequence(result.prediction, result.confidence)
-        console.log(`📊 Add result: ${wasAdded ? 'SUCCESS' : 'BLOCKED'}`)
+        console.log(`Add result: ${wasAdded ? 'SUCCESS' : 'BLOCKED'}`)
       } else {
-        console.log(`❌ SKIPPED: success=${result.success}, prediction="${result.prediction}"`)
+        console.log(`SKIPPED: success=${result.success}, prediction="${result.prediction}"`)
       }
       
       // Send to parent for history (this might be causing the double in history too)
-      console.log(`📤 Sending to history: ${result.prediction}`)
+      console.log(`Sending to history: ${result.prediction}`)
       onPrediction(result, imageUrl)
 
     } catch (err) {
@@ -425,7 +427,7 @@ const CameraCapture = ({ language, onPrediction }) => {
     
     // CLEAN: Prevent multiple timer instances
     if (isTimerActiveRef.current) {
-      console.log('⏰ TIMER: Already active, ignoring')
+      console.log('TIMER: Already active, ignoring')
       return
     }
 
@@ -434,18 +436,19 @@ const CameraCapture = ({ language, onPrediction }) => {
     predictionSourceRef.current = 'timer'
     setCountdown(timerSeconds)
     
-    console.log(`⏰ TIMER: Starting ${timerSeconds}s countdown`)
+    console.log(`TIMER: Starting ${timerSeconds}s countdown`)
     
     const timer = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) {
           clearInterval(timer)
-          console.log(`⏰ TIMER: Countdown finished - calling prediction`)
+          console.log(`TIMER: Countdown finished - calling prediction`)
           
           // CLEAN: Direct call with explicit source
           setTimeout(() => {
-            if (isTimerActiveRef.current) { // Double check timer is still active
+            if (isTimerActiveRef.current) { 
               predictFromCamera('timer')
+              isTimerActiveRef.current = false
             }
           }, 200)
           
@@ -467,11 +470,11 @@ const CameraCapture = ({ language, onPrediction }) => {
       }
       setIsAutoCapture(false)
       predictionSourceRef.current = 'manual'
-      console.log('🤖 AUTO: Stopped')
+      console.log('AUTO: Stopped')
     } else {
       setIsAutoCapture(true)
       predictionSourceRef.current = 'auto'
-      console.log('🤖 AUTO: Started')
+      console.log('AUTO: Started')
       
       autoIntervalRef.current = setInterval(() => {
         if (!isCapturing && isStreaming && backendStatus === 'connected') {
@@ -488,7 +491,7 @@ const CameraCapture = ({ language, onPrediction }) => {
 
   // Auto-start camera when component mounts
   useEffect(() => {
-    console.log('🚀 Component mounted - checking video element...')
+    console.log('Component mounted - checking video element...')
     
     const checkAndStart = () => {
       if (videoRef.current) {
@@ -810,6 +813,21 @@ const CameraCapture = ({ language, onPrediction }) => {
                 <FlipHorizontal2 className="w-4 h-4" />
                 {isMirrored ? 'Cermin Nyala' : 'Cermin Mati'}
               </button>
+
+                <button
+                  onClick={() => {
+                    const next = facingMode === 'user' ? 'environment' : 'user'
+                    setFacingMode(next)
+                    stopCamera()
+                    setTimeout(() => {
+                      startCamera()
+                    }, 300)  
+                  }}
+                  className="p-2 rounded-lg text-sm bg-gray-200 hover:bg-gray-300"
+                  title="Ganti Kamera"
+                >
+                  {facingMode === 'user' ? 'Kamera Belakang' : 'Kamera Depan'}
+                </button>
             </div>
           </div>
 
