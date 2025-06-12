@@ -1,5 +1,5 @@
 
-### Silent Frontend
+# Silent Frontend
 
 Proyek ini adalah bagian frontend dari aplikasi Silent, dibangun menggunakan alat pengembangan web modern. Proyek ini memanfaatkan teknologi seperti Vite, TailwindCSS, dan PostCSS untuk pengembangan yang cepat, bersama dengan ESLint untuk menjaga kualitas dan konsistensi kode.
 
