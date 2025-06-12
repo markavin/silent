@@ -10,7 +10,7 @@ const Header = () => {
   const navigation = [
     { name: 'Beranda', href: '/' },
     { name: 'Terjemahan', href: '/translate' },
-    { name: 'Histori', href: '/history' },
+    { name: 'Riwayat', href: '/history' },
     { name: 'Tentang Kami', href: '/about' },
   ]
 
