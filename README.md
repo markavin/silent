@@ -40,6 +40,27 @@ silent-frontend/
         ├── .eslintrc.cjs                   ← Konfigurasi ESLint
         └── .gitignore                      ← File yang diabaikan Git
 ```
+## Tech overview
+* Bahasa:
+    - JavaScript (ES6+)
+    - HTML5
+    - CSS3
+
+* Framework & Library:
+    - React.js 18.2.0
+    - React DOM 18.2.0
+    - React Router DOM 6.20.1
+    - Vite 6.3.5
+    - @vitejs/plugin-react 4.1.1
+    - Tailwind CSS 3.3.5
+    - PostCSS 8.4.31
+    - Autoprefixer 10.4.16
+    - @mediapipe/hands 0.4.1675469240
+    - @tensorflow/tfjs 4.22.0
+    - Axios 1.6.2
+    - Lucide React 0.294.0
+    - FontAwesome
+    - ESLint 8.53.0
 
 ## Instalasi
 
