@@ -814,20 +814,24 @@ const CameraCapture = ({ language, onPrediction }) => {
                 {isMirrored ? 'Cermin Nyala' : 'Cermin Mati'}
               </button>
 
-                <button
-                  onClick={() => {
-                    const next = facingMode === 'user' ? 'environment' : 'user'
-                    setFacingMode(next)
-                    stopCamera()
-                    setTimeout(() => {
-                      startCamera()
-                    }, 300)  
-                  }}
-                  className="p-2 rounded-lg text-sm bg-gray-200 hover:bg-gray-300"
-                  title="Ganti Kamera"
-                >
-                  {facingMode === 'user' ? 'Kamera Belakang' : 'Kamera Depan'}
-                </button>
+              <button
+                onClick={() => {
+                  const next = facingMode === 'user' ? 'environment' : 'user'
+                  setFacingMode(next)
+                  stopCamera()
+                  setTimeout(() => {
+                    startCamera()
+                  }, 300)
+                }}
+                className={`p-2 rounded-lg text-sm ${
+                  facingMode === 'user'
+                    ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    : 'bg-blue-500 text-white'
+                }`}
+                title="Ganti Kamera"
+              >
+                {facingMode === 'user' ? 'Kamera Depan' : 'Kamera Belakang'}
+              </button>
             </div>
           </div>
 
